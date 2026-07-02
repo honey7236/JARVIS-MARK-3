@@ -38,8 +38,8 @@ except ImportError:
 # Project-specific imports
 from backend.text_to_speech import speak
 from backend.chat_bot import ChatBot
-from data.DLG_data import online_DLG, offline_DLG
-from data.Web_Data import websites
+from data.dlg_data import online_DLG, offline_DLG
+from data.web_data import websites
 from data.contact_data import contacts
 
 # ==========================================
