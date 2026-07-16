@@ -333,6 +333,49 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
+    // Microphone Toggle System
+    const btnToggleMic = document.getElementById("btn-toggle-mic");
+    let isMuted = false;
+
+    if (btnToggleMic) {
+        // Fetch current mic state from python on initialization
+        try {
+            eel.get_mic_state()((muted) => {
+                isMuted = muted;
+                updateMicUI();
+            });
+        } catch (e) {
+            console.error("Failed to fetch initial mic state:", e);
+        }
+
+        btnToggleMic.addEventListener("click", () => {
+            isMuted = !isMuted;
+            try {
+                // Call python function to toggle mic state
+                eel.toggle_mic(isMuted)((muted) => {
+                    isMuted = muted;
+                    updateMicUI();
+                });
+            } catch (e) {
+                console.error("Failed to toggle mic:", e);
+                // Fallback local UI update if python not initialized
+                updateMicUI();
+            }
+        });
+
+        function updateMicUI() {
+            if (isMuted) {
+                btnToggleMic.textContent = "MIC: MUTED";
+                btnToggleMic.classList.remove("mic-unmuted");
+                btnToggleMic.classList.add("mic-muted");
+            } else {
+                btnToggleMic.textContent = "MIC: ON";
+                btnToggleMic.classList.remove("mic-muted");
+                btnToggleMic.classList.add("mic-unmuted");
+            }
+        }
+    }
+
     // Align Scanner (Reset camera view)
     if (btnResetCam) {
         btnResetCam.addEventListener("click", () => {
@@ -598,7 +641,7 @@ document.addEventListener("DOMContentLoaded", () => {
             if (statusEl) {
                 statusEl.textContent = status.toUpperCase();
                 // Clear existing state classes
-                statusEl.classList.remove("listening", "thinking", "answering", "translating", "active");
+                statusEl.classList.remove("listening", "thinking", "answering", "translating", "active", "muted");
                 // Add the new state class
                 statusEl.classList.add(status.toLowerCase().replace("...", "").trim());
             }
@@ -615,6 +658,9 @@ document.addEventListener("DOMContentLoaded", () => {
                 } else if (stateKey === "answering") {
                     state.baseRotationSpeed = 0.005; // Slow down during vocal reply
                     state.lights.reactorGlow.color.setHex(0xff2a2a); // Stark red warning/attention core
+                } else if (stateKey === "muted") {
+                    state.baseRotationSpeed = 0.002; // Very slow rotation to indicate standby
+                    state.lights.reactorGlow.color.setHex(0x555555); // Glowing dim grey
                 } else {
                     // Reset to active/idle state defaults
                     state.baseRotationSpeed = 0.01;

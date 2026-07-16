@@ -44,6 +44,22 @@ def get_weather_data():
     return display_weather_data()
 
 @eel.expose
+def toggle_mic(muted):
+    import backend.speech_to_text
+    from backend.speech_to_text import SetAssistantStatus
+    backend.speech_to_text.is_mic_muted = muted
+    if muted:
+        SetAssistantStatus("Muted")
+    else:
+        SetAssistantStatus("Listening...")
+    return muted
+
+@eel.expose
+def get_mic_state():
+    import backend.speech_to_text
+    return getattr(backend.speech_to_text, "is_mic_muted", False)
+
+@eel.expose
 def get_news_data():
     try:
         return get_news()

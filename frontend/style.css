@@ -231,6 +231,11 @@ body {
     color: var(--theme-color);
     text-shadow: var(--theme-glow);
 }
+.status-value.muted {
+    color: #6d84a3 !important;
+    text-shadow: none !important;
+    opacity: 0.6;
+}
 
 @keyframes status-pulse-thinking {
     from { opacity: 0.85; }
@@ -717,6 +722,21 @@ body {
     border-color: var(--theme-color);
     box-shadow: 0 0 12px rgba(var(--theme-color-rgb), 0.5);
     text-shadow: var(--theme-glow);
+}
+
+/* Mic Button Custom overrides */
+#btn-toggle-mic.mic-muted {
+    background: rgba(255, 42, 42, 0.15) !important;
+    border-color: rgba(255, 42, 42, 0.6) !important;
+    color: #ff2a2a !important;
+    box-shadow: 0 0 8px rgba(255, 42, 42, 0.3) !important;
+    text-shadow: 0 0 5px rgba(255, 42, 42, 0.4) !important;
+}
+#btn-toggle-mic.mic-muted:hover {
+    background: rgba(255, 42, 42, 0.3) !important;
+    border-color: #ff2a2a !important;
+    box-shadow: 0 0 15px rgba(255, 42, 42, 0.6) !important;
+    text-shadow: 0 0 8px rgba(255, 42, 42, 0.8) !important;
 }
 
 /* HUD Sci-fi Refresh Button */

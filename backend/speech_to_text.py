@@ -11,6 +11,7 @@ InputLanguage = env_vars.get("InputLanguage") or "en"
 
 # Initialize speech recognizer
 recognizer = sr.Recognizer()
+is_mic_muted = False
 
 # Optimize sensitivity and noise thresholds
 recognizer.energy_threshold = 600      # Initial threshold slightly higher for static protection
@@ -76,6 +77,11 @@ def UniversalTranslator(Text):
 
 # Function to perform speech recognition using the microphone.
 def listen():
+    global is_mic_muted
+    while is_mic_muted:
+        SetAssistantStatus("Muted")
+        time.sleep(0.5)
+
     SetAssistantStatus("Listening...")
     
     # Map input language to standard locale strings
@@ -94,6 +100,10 @@ def listen():
             SetAssistantStatus("Active")
             time.sleep(1.0)  # Sleep on hardware/mic errors to prevent busy-looping
             return ""
+
+    if is_mic_muted:
+        SetAssistantStatus("Muted")
+        return ""
 
     SetAssistantStatus("Thinking...")
     try:
