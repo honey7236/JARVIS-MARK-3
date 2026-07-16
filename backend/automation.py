@@ -10,30 +10,23 @@ import webbrowser
 from datetime import datetime, timedelta
 from urllib.parse import quote
 import asyncio
+import heapq  # Added for O(1) Min-Heap Reminders
 
 # Third-party libraries
 import psutil
 import requests
 import eel
 from plyer import notification
-import keyboard
 import pyautogui
-from bs4 import BeautifulSoup
 from dotenv import dotenv_values
 from rich import print
 
-# AppOpener and pywhatkit
+# AppOpener
 from AppOpener import close, open as appopen
 
 # Bypass pywhatkit's internet connection check on import which can hang indefinitely
 import pywhatkit.core.core
 pywhatkit.core.core.check_connection = lambda: None
-
-from pywhatkit import search, playonyt
-try:
-    from backend.groq_client import Groq
-except ImportError:
-    from groq_client import Groq
 
 # Project-specific imports
 from backend.text_to_speech import speak
@@ -51,8 +44,6 @@ OpenWeatherAPIKey = env_vars.get("OpenWeatherAPIKey")
 GNewsAPIKey = env_vars.get("GNewsAPIKey")
 API_KEY = OpenWeatherAPIKey
 
-# Greetings will be chosen dynamically on each check to keep responses fresh.
-
 cached_network_data = {
     "status": "Checking...",
     "ping": "...",
@@ -60,36 +51,19 @@ cached_network_data = {
     "upload": "..."
 }
 
+# Heap-based reminders
 reminders = []
 reminder_thread_started = False
 
-# ==========================================
-# Groq & Content Writing Constants (from automation_source.py)
-# ==========================================
-GroqAPIKey = env_vars.get("GroqAPIKey")  # Retrieve the Groq API key from the environment variables.
+# Location & Weather API Caching to prevent duplicate slow HTTP queries
+cached_city = None
+cached_weather_str = None
+cached_weather_dict = None
+cached_weather_time = 0
 
-# Define CSS classes for parsing elements in the HTML content.
-classes = ["zCubwf", "hgKElc", "LTK00 sY7ric", "Z0LcW", "gsrt vk_bk FzvWSb YwPhnf", "pclqee", "tw-Data-text tw-text-small tw-ta", 
-           "IZ6rdc", "05uR6d LTK00", "vlzY6d", "webanswers-webanswers_table_webanswers-table", "dDoNo ikb4Bb gsrt", "sXLa0e", 
-           "LWkfKe", "VQF4g", "qv3Wpe", "kno-rdesc", "SPZz6b"]
-
-# Define a user-agent for making web requests.
-useragent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.4896.75 Safari/537.36'
-
-# Initialize the Groq client with the API key.
-client = Groq(api_key=GroqAPIKey)
-
-# Predefined professional responses for user interactions.
-professional_responses = [
-    "Your satisfaction is my top priority; feel free to reach out if there's anything else I can help you with.",
-    "I'm at your service for any additional questions or support you may need-don't hesitate to ask.", 
-]
-
-# List to store chatbot messages.
-messages = []
-
-# System message to provide context to the chatbot.
-SystemChatBot = [{"role": "system", "content": f"Hello, I am {os.environ.get('Username', 'User')}, You're a content writer. You have to write content like letters, codes, applications, eassys, notes, songs, poems etc."}]
+# News API Caching
+cached_news = None
+cached_news_time = 0
 
 # ==========================================
 # Battery Automation
@@ -237,10 +211,19 @@ def get_cached_status():
 # News Automation
 # ==========================================
 def get_news():
+    global cached_news, cached_news_time
+    now = time.time()
+    # Cache news headlines for 10 minutes (600 seconds)
+    if cached_news and (now - cached_news_time) < 600:
+        return cached_news
+
     newsapi = GNewsAPIKey
+    if not newsapi or "your_gnews_api_key" in newsapi.lower():
+        return "GNews API Key is not configured."
+
     url = f"https://gnews.io/api/v4/top-headlines?category=general&lang=en&apikey={newsapi}"
     try:
-        response = requests.get(url)
+        response = requests.get(url, timeout=5)
         data = response.json()
         articles = data.get("articles", [])
 
@@ -248,7 +231,9 @@ def get_news():
             return "No news available"
 
         headlines = [f"{i}. {article.get('title', '')}" for i, article in enumerate(articles, 1)]
-        return "\n".join(headlines)
+        cached_news = "\n".join(headlines)
+        cached_news_time = now
+        return cached_news
     except Exception as e:
         print("News Error:", e)
         return "Unable to fetch news"
@@ -257,7 +242,7 @@ def get_news():
 # ==========================================
 # Open App Automation
 # ==========================================
-def open_app(app, sess=requests.session()):
+def open_app(app):
     app_clean = app.lower().replace("run", "").replace("open", "").strip()
 
     try:
@@ -365,10 +350,8 @@ def save_reminder(task, time_input):
     if remind_time <= now:
         remind_time += timedelta(days=1)
 
-    reminders.append({
-        "task": task,
-        "time": remind_time
-    })
+    # Use heapq for O(1) top-element check complexity
+    heapq.heappush(reminders, (remind_time, task))
     print("✅ Saved:", task, "at", remind_time.strftime("%I:%M %p"))
     return f"Reminder set for {task} at {remind_time.strftime('%I:%M %p')}"
 
@@ -376,29 +359,28 @@ def save_reminder(task, time_input):
 def reminder_loop():
     while True:
         now = datetime.now()
-        for r in reminders[:]:
-            if now >= r["time"]:
-                message = f"Reminder: {r['task']}"
-                speak(message)
-                
-                # Show desktop notification
-                try:
-                    notification.notify(
-                        title="J.A.R.V.I.S. Reminder",
-                        message=r["task"],
-                        timeout=10
-                    )
-                except Exception:
-                    pass
-                
-                reminders.remove(r)
+        # With min-heap, we check the top element in O(1) time
+        while reminders and now >= reminders[0][0]:
+            remind_time, task = heapq.heappop(reminders)
+            message = f"Reminder: {task}"
+            speak(message)
+            
+            # Show desktop notification
+            try:
+                notification.notify(
+                    title="J.A.R.V.I.S. Reminder",
+                    message=task,
+                    timeout=10
+                )
+            except Exception:
+                pass
         time.sleep(5)
 
 
 def start_reminder_thread():
     thread = threading.Thread(target=reminder_loop, daemon=True)
     thread.start()
-    print("🚀 Reminder system started")
+    print("🚀 Heap-based Reminder system started")
 
 
 # ==========================================
@@ -465,50 +447,73 @@ def display_system_info():
 # Weather Automation
 # ==========================================
 def get_city_from_ip():
+    global cached_city
+    if cached_city:
+        return cached_city
     try:
-        res = requests.get("https://ipinfo.io/json")
+        res = requests.get("https://ipinfo.io/json", timeout=3)
         data = res.json()
-        city = data.get("city")
-        return city
+        cached_city = data.get("city")
+        return cached_city
     except Exception as e:
         print("Location Error:", e)
         return None
 
 
 def get_weather():
+    global cached_weather_str, cached_weather_time
+    now = time.time()
+    # Cache weather strings for 10 minutes (600 seconds)
+    if cached_weather_str and (now - cached_weather_time) < 600:
+        return cached_weather_str
+
     try:
         city = get_city_from_ip()
         if not city:
             return "Unable to detect your location"
 
+        if not API_KEY or "your_openweather_api_key" in API_KEY.lower():
+            return "OpenWeather API Key is not configured."
+
         url = f"http://api.openweathermap.org/data/2.5/weather?q={city}&appid={API_KEY}&units=metric"
-        response = requests.get(url)
+        response = requests.get(url, timeout=4)
         data = response.json()
 
-        if data["cod"] != 200:
+        if data.get("cod") != 200:
             return "Weather data not found"
 
         temp = data["main"]["temp"]
         feels_like = data["main"]["feels_like"]
         weather = data["weather"][0]["description"]
 
-        return f"Current weather in {city}: {temp}°C, feels like {feels_like}°C with {weather}"
+        cached_weather_str = f"Current weather in {city}: {temp}°C, feels like {feels_like}°C with {weather}"
+        cached_weather_time = now
+        return cached_weather_str
     except Exception as e:
         print("Weather Error:", e)
         return "Unable to fetch weather"
     
 
 def display_weather():
+    global cached_weather_dict, cached_weather_time
+    now = time.time()
+    # Cache weather dictionary for 10 minutes (600 seconds)
+    if cached_weather_dict and (now - cached_weather_time) < 600:
+        return cached_weather_dict
+
     try:
         city = get_city_from_ip()
         if not city:
             return "Unable to detect your location"
 
+        if not API_KEY or "your_openweather_api_key" in API_KEY.lower():
+            return "OpenWeather API Key is not configured."
+
         url = f"http://api.openweathermap.org/data/2.5/weather?q={city}&appid={API_KEY}&units=metric"
-        response = requests.get(url)
+        response = requests.get(url, timeout=4)
         data = response.json()
 
-        if data["cod"] != 200:
+        if data.get("cod") != 200:
             return "Weather data not found"
 
         temp = data["main"]["temp"]
@@ -517,7 +522,7 @@ def display_weather():
         humidity = data["main"]["humidity"]
         wind_speed = data["wind"]["speed"]
 
-        return {
+        cached_weather_dict = {
             "city": city,
             "temp": f"{temp}°C",
             "feels_like": f"{feels_like}°C",
@@ -525,6 +530,8 @@ def display_weather():
             "humidity": f"{humidity}%",
             "wind": f"{wind_speed} m/s"
         }
+        cached_weather_time = now
+        return cached_weather_dict
     except Exception as e:
         print("Weather Error:", e)
         return "Unable to fetch weather"

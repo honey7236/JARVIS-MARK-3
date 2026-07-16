@@ -93,13 +93,13 @@ def MainExecution():
                     file.write(f"{ImageGenerationQuery},True")
                     
                 try:
-                    p1 = subprocess.Popen([sys.executable, r'backend\imagegeneration.py'],
+                    p1 = subprocess.Popen([sys.executable, r'backend\image_generation.py'],
                                           stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                           stdin=subprocess.PIPE, shell=False)
                     subprocesses.append(p1)
                     
                 except Exception as e:
-                    print(f"Error starting imagegeneration.py: {e}")
+                    print(f"Error starting image_generation.py: {e}")
                     
             if G and R or R:
                 print("Searching...")

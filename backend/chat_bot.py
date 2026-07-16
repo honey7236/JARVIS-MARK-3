@@ -5,7 +5,7 @@ except ImportError:
     from groq_client import Groq
 from json import load, dump  # Importing functions to read and write JSON files.
 import datetime  # Importing the datetime module for real-time date and time information.
-from dotenv import load_dotenv, dotenv_values  # Importing dotenv_values to read environment variables from a .env file.
+from dotenv import dotenv_values  # Importing dotenv_values to read environment variables from a .env file.
 
 # Load environment variables from the .env file.
 env_vars = dotenv_values(".env")
