@@ -126,5 +126,29 @@
     {
         "role": "assistant",
         "content": "The weather in Hyderabad is mostly sunny with a high of 32 degrees and a low of 23 degrees."
+    },
+    {
+        "role": "user",
+        "content": "Hello jarvis."
+    },
+    {
+        "role": "assistant",
+        "content": "I'm here."
+    },
+    {
+        "role": "user",
+        "content": "Hey jarvis."
+    },
+    {
+        "role": "assistant",
+        "content": "Hello."
+    },
+    {
+        "role": "user",
+        "content": "Hey jarvis whatsapp."
+    },
+    {
+        "role": "assistant",
+        "content": "Your WhatsApp is available, would you like to send a message or make a call?"
     }
 ]

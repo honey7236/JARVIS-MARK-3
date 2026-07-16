@@ -14,10 +14,8 @@ recognizer = sr.Recognizer()
 is_mic_muted = False
 
 # Optimize sensitivity and noise thresholds
-recognizer.energy_threshold = 600      # Initial threshold slightly higher for static protection
-recognizer.dynamic_energy_threshold = True  # Dynamically adapt to room noise levels
-recognizer.dynamic_energy_adjustment_damping = 0.15
-recognizer.dynamic_energy_ratio = 1.5
+recognizer.energy_threshold = 1000      # Safe default threshold
+recognizer.dynamic_energy_threshold = False  # Disable auto-decay to prevent small noises from triggering
 
 # Set path for assistant status telemetry files
 current_dir = os.getcwd()
@@ -29,6 +27,9 @@ print("[SpeechToText] Calibrating microphone for ambient noise floor...")
 try:
     with sr.Microphone() as source:
         recognizer.adjust_for_ambient_noise(source, duration=1.0)
+    # Enforce a minimum threshold floor to ignore small background noises/mouse clicks
+    if recognizer.energy_threshold < 1500:
+        recognizer.energy_threshold = 1500
     print(f"[SpeechToText] Calibration complete. Energy threshold set to: {recognizer.energy_threshold}")
 except Exception as e:
     print(f"[SpeechToText] Microphone calibration skipped: {e}")
