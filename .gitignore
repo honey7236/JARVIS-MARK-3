@@ -1,38 +1,30 @@
-# Environment Variables
+# Environment and API keys
 .env
-.env.*
+*.env
+brain/.env
+local/.env
 
-# Python
+# Python bytecode and virtual environments
 __pycache__/
-*.pyc
-*.pyo
-*.pyd
-
-# Virtual Environment
-venv/
+*.py[cod]
+*$py.class
 .venv/
 env/
+venv/
+ENV/
 
-# VS Code
-.vscode/
+# Dynamic runtime databases
+brain/database/chats_data/*.json
+!brain/database/chats_data/chat_legacy_history.json
+brain/database/vector_store/*
+!brain/database/vector_store/.gitkeep
+Data/*.mp3
 
-# JetBrains
-.idea/
-
-# Logs
-*.log
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Build
-dist/
+# Build & distribution artifacts
 build/
+dist/
+*.spec
 
-# Cache
-.cache/
-
-# Secrets
-*.pem
-*.key
+# Temporary files
+*.data
+*.log

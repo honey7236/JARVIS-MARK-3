@@ -1,3 +1,6 @@
+# JARVIS Mark III Unified Dependencies (union of JARVIS-MARK-2 and JARVIS-chatbot, without cohere)
+
+# Local Client & Voice / Automation
 python-dotenv
 groq
 AppOpener
@@ -5,12 +8,10 @@ bs4
 pillow
 rich
 keyboard
-cohere
 mtranslate
 pygame
 edge-tts
 Eel==0.18.2
-requests==2.33.1
 SpeechRecognition==3.16.0
 PyAudio==0.2.14
 pywhatkit==5.4
@@ -18,3 +19,20 @@ pyautogui==0.9.54
 psutil==7.2.2
 plyer==2.1.0
 pyinstaller==6.20.0
+
+# Brain Intelligence Microservice
+fastapi
+uvicorn[standard]
+langchain
+langchain-groq
+langchain-community
+langchain-core
+sentence-transformers
+faiss-cpu
+pydantic
+numpy
+torch
+transformers
+requests
+tavily-python
+langchain-huggingface
