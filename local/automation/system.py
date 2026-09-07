@@ -233,11 +233,8 @@ def network_status_loop():
             "upload": upload_speed if online == "Connected" else "N/A"
         }
 
-        try:
-            import eel
-            eel.updateNetwork(cached_network_data)
-        except Exception:
-            pass
+        # Cache updated telemetry
+        pass
 
         time.sleep(5)
 

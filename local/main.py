@@ -35,7 +35,7 @@ current_session_id = None
 last_print_was_listening = False
 
 
-def _offline_fallback(query: str) -> bool:
+def _offline_fallback(query: str, enable_speech: bool = True) -> bool:
     """
     Fallback when Brain microservice is unreachable.
     Executes basic local commands offline so essential PC control still works.
@@ -62,21 +62,24 @@ def _offline_fallback(query: str) -> bool:
         app_name = q.replace("close ", "", 1).strip()
         result = close_app(app_name)
     elif q in ["exit", "quit", "goodbye"]:
-        speak("Goodbye sir.")
+        if enable_speech:
+            speak("Goodbye sir.")
         os._exit(0)
 
     if result:
         print(f"[{Assistantname} (Offline)] : {result}")
-        speak(result)
+        if enable_speech:
+            speak(result)
         return True
     else:
         msg = "The Brain intelligence service is unreachable. Please verify python run.py is running in brain."
         print(f"[{Assistantname}] : {msg}")
-        speak(msg)
+        if enable_speech:
+            speak(msg)
         return False
 
 
-def process_query(query: str) -> bool:
+def process_query(query: str, enable_speech: bool = True) -> bool:
     """
     Process a single query string through the Brain / Local architecture.
     Returns True on successful processing.
@@ -117,18 +120,21 @@ def process_query(query: str) -> bool:
                 if result == "exit":
                     farewell = "Goodbye sir. Shutting down system."
                     print(f"{Assistantname} : {farewell}")
-                    speak(farewell)
+                    if enable_speech:
+                        speak(farewell)
                     os._exit(0)
 
                 if result:
                     print(f"{Assistantname} : {result}")
-                    speak(result)
+                    if enable_speech:
+                        speak(result)
                 return True
 
             elif intent_type in ["chat", "realtime"]:
                 answer = data.get("response", "I am unable to answer that at the moment.")
                 print(f"{Assistantname} : {answer}")
-                speak(answer)
+                if enable_speech:
+                    speak(answer)
                 return True
 
             else:
@@ -137,11 +143,11 @@ def process_query(query: str) -> bool:
 
         else:
             print(f"[Brain HTTP Error {response.status_code}]: {response.text}")
-            return _offline_fallback(query)
+            return _offline_fallback(query, enable_speech=enable_speech)
 
     except requests.exceptions.ConnectionError:
         print("[Brain Connection Error]: Brain server not responding at", BRAIN_URL)
-        return _offline_fallback(query)
+        return _offline_fallback(query, enable_speech=enable_speech)
     except Exception as e:
         print(f"[Error processing query]: {e}")
         return False

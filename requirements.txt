@@ -11,7 +11,6 @@ keyboard
 mtranslate
 pygame
 edge-tts
-Eel==0.18.2
 SpeechRecognition==3.16.0
 PyAudio==0.2.14
 pywhatkit==5.4

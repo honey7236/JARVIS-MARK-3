@@ -116,9 +116,9 @@ class TestAutomationModules(unittest.TestCase):
         spoken_weather = get_weather()
         self.assertIn("Weather in", spoken_weather)
 
-    def test_app_chat_log_retrieval(self):
-        from local.app import get_chat_log
-        logs = get_chat_log()
+    def test_chat_history_retrieval(self):
+        from jarvis_cli import get_chat_history
+        logs = get_chat_history(limit=5)
         self.assertIsInstance(logs, list)
 
 

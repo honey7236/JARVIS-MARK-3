@@ -50,16 +50,24 @@ def GetAssistantStatus() -> str:
     return _assistant_status
 
 
+_status_callback = None
+
+
+def set_status_callback(cb):
+    """Register an optional callback for status changes (e.g. for CLI display)."""
+    global _status_callback
+    _status_callback = cb
+
+
 def SetAssistantStatus(status: str):
-    """Update assistant status in-memory and dispatch to Eel GUI."""
+    """Update assistant status in-memory and dispatch to listener if registered."""
     global _assistant_status
     _assistant_status = status
-
-    try:
-        import eel
-        eel.updateStatus(status)
-    except Exception:
-        pass
+    if _status_callback:
+        try:
+            _status_callback(status)
+        except Exception:
+            pass
 
 
 def QueryModifier(query: str) -> str:
