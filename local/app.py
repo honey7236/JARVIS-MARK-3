@@ -303,18 +303,27 @@ def check_login_status():
 
 @eel.expose
 def get_chat_log():
-    """Reads recent session messages from brain database or returns empty."""
+    """Reads recent session messages from brain database in chronological order."""
     chat_dir = BASE_DIR.parent / "brain" / "database" / "chats_data"
     all_messages = []
     if chat_dir.exists():
-        for chat_file in sorted(chat_dir.glob("*.json"), key=os.path.getmtime, reverse=True)[:5]:
+        recent_files = sorted(
+            [f for f in chat_dir.glob("*.json") if f.name != "chat_legacy_history.json"],
+            key=os.path.getmtime,
+            reverse=True
+        )[:5]
+
+        if not recent_files and (chat_dir / "chat_legacy_history.json").exists():
+            recent_files = [chat_dir / "chat_legacy_history.json"]
+
+        for chat_file in reversed(recent_files):
             try:
                 with open(chat_file, "r", encoding="utf-8") as f:
                     data = json.load(f)
                     all_messages.extend(data.get("messages", []))
             except Exception:
                 pass
-    return all_messages
+    return all_messages[-50:] if len(all_messages) > 50 else all_messages
 
 
 # ============================================================

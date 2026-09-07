@@ -159,6 +159,10 @@ class IntentService:
             target = q.replace("youtube search ", "", 1).strip()
             return QueryIntentSchema(intent_type="automation", action="youtube_search", target=target)
 
+        # Reminder
+        if q.startswith("remind me to ") or q.startswith("set reminder ") or q.startswith("set a reminder "):
+            return QueryIntentSchema(intent_type="automation", action="reminder", target=query)
+
         return None
 
     def _invoke_classifier(self, query: str) -> QueryIntentSchema:

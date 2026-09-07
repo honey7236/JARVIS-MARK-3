@@ -101,6 +101,26 @@ class TestAutomationModules(unittest.TestCase):
 
         self.assertEqual(execute_automation("exit"), "exit")
 
+        # Test natural language reminder through dispatcher
+        reminder_res = execute_automation("reminder", "remind me to call the doctor at 4:30 pm")
+        self.assertIn("call the doctor", reminder_res)
+        self.assertIn("04:30 PM", reminder_res)
+
+    def test_weather_telemetry(self):
+        from local.automation.system import display_weather, get_weather
+        weather = display_weather()
+        self.assertIsInstance(weather, dict)
+        self.assertIn("temp", weather)
+        self.assertIn("city", weather)
+
+        spoken_weather = get_weather()
+        self.assertIn("Weather in", spoken_weather)
+
+    def test_app_chat_log_retrieval(self):
+        from local.app import get_chat_log
+        logs = get_chat_log()
+        self.assertIsInstance(logs, list)
+
 
 if __name__ == "__main__":
     unittest.main()

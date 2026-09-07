@@ -39,8 +39,26 @@ async def TextToAudioFile(text: str, file_path: str) -> None:
     await communicate.save(file_path)
 
 
+def _run_async(coro):
+    """Safely run an async coroutine even if an event loop is already active."""
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        loop = None
+
+    if loop and loop.is_running():
+        import concurrent.futures
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+            return pool.submit(asyncio.run, coro).result()
+    else:
+        return asyncio.run(coro)
+
+
 def TTS(Text: str, func=lambda r=None: True) -> bool:
     """Manage Text-to-Speech (TTS) conversion and playback via pygame."""
+    if not Text or not str(Text).strip():
+        return False
+
     SetAssistantStatus("Answering...")
 
     data_dir = Path("Data")
@@ -50,7 +68,7 @@ def TTS(Text: str, func=lambda r=None: True) -> bool:
     retries = 3
     for attempt in range(retries):
         try:
-            asyncio.run(TextToAudioFile(Text, file_path))
+            _run_async(TextToAudioFile(Text, file_path))
 
             pygame.mixer.init()
             pygame.mixer.music.load(file_path)
@@ -74,9 +92,10 @@ def TTS(Text: str, func=lambda r=None: True) -> bool:
         finally:
             try:
                 func(False)
-                pygame.mixer.music.stop()
-                pygame.mixer.music.unload()
-                pygame.mixer.quit()
+                if pygame.mixer.get_init():
+                    pygame.mixer.music.stop()
+                    pygame.mixer.music.unload()
+                    pygame.mixer.quit()
 
                 if os.path.exists(file_path):
                     os.remove(file_path)

@@ -24,15 +24,25 @@ _assistant_status = "Active"
 recognizer.energy_threshold = 1000
 recognizer.dynamic_energy_threshold = False
 
-print("[SpeechToText] Calibrating microphone for ambient noise...")
-try:
-    with sr.Microphone() as source:
-        recognizer.adjust_for_ambient_noise(source, duration=1.0)
-    if recognizer.energy_threshold < 1500:
-        recognizer.energy_threshold = 1500
-    print(f"[SpeechToText] Calibration complete. Energy threshold: {recognizer.energy_threshold}")
-except Exception as e:
-    print(f"[SpeechToText] Microphone calibration skipped: {e}")
+_calibrated = False
+
+
+def calibrate_mic():
+    """Calibrate microphone for ambient noise lazily on first audio capture."""
+    global _calibrated
+    if _calibrated:
+        return
+    try:
+        print("[SpeechToText] Calibrating microphone for ambient noise...")
+        with sr.Microphone() as source:
+            recognizer.adjust_for_ambient_noise(source, duration=0.8)
+        if recognizer.energy_threshold < 1500:
+            recognizer.energy_threshold = 1500
+        print(f"[SpeechToText] Calibration complete. Energy threshold: {recognizer.energy_threshold}")
+    except Exception as e:
+        print(f"[SpeechToText] Microphone calibration skipped: {e}")
+    finally:
+        _calibrated = True
 
 
 def GetAssistantStatus() -> str:
@@ -88,6 +98,7 @@ def listen() -> str:
     Capture microphone audio, transcribe via Google Speech API, and return formatted query.
     """
     global is_mic_muted
+    calibrate_mic()
     while is_mic_muted:
         SetAssistantStatus("Muted")
         time.sleep(0.5)
