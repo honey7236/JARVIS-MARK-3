@@ -274,3 +274,78 @@ def get_date_time() -> str:
     date = now.strftime("%A, %d %B %Y")
     time_str = now.strftime("%I:%M %p")
     return f"Today is {date} and the time is {time_str}"
+
+
+# ==========================================
+# Weather Telemetry for GUI Dashboard
+# ==========================================
+
+cached_weather_dict = None
+cached_weather_time = 0
+
+
+def display_weather() -> dict:
+    """Fetch or return cached weather information for the HUD card."""
+    global cached_weather_dict, cached_weather_time
+    now = time.time()
+
+    if cached_weather_dict and (now - cached_weather_time) < 600:
+        return cached_weather_dict
+
+    api_key = env_vars.get("OpenWeatherAPIKey", "")
+    default_weather = {
+        "city": "MALIBU",
+        "temp": "24°C",
+        "feels_like": "25°C",
+        "description": "Clear Sky",
+        "humidity": "45%",
+        "wind": "3.5 m/s"
+    }
+
+    if not api_key or "your_" in api_key.lower():
+        cached_weather_dict = default_weather
+        cached_weather_time = now
+        return cached_weather_dict
+
+    try:
+        # Detect city from IP
+        city = "New Delhi"
+        try:
+            ip_res = requests.get("https://ipinfo.io/json", timeout=3)
+            if ip_res.status_code == 200:
+                city = ip_res.json().get("city", "New Delhi")
+        except Exception:
+            pass
+
+        url = f"http://api.openweathermap.org/data/2.5/weather?q={city}&appid={api_key}&units=metric"
+        response = requests.get(url, timeout=4)
+        if response.status_code == 200:
+            data = response.json()
+            temp = data["main"]["temp"]
+            feels_like = data["main"]["feels_like"]
+            weather = data["weather"][0]["description"]
+            humidity = data["main"]["humidity"]
+            wind_speed = data["wind"]["speed"]
+
+            cached_weather_dict = {
+                "city": city,
+                "temp": f"{temp}°C",
+                "feels_like": f"{feels_like}°C",
+                "description": weather.title(),
+                "humidity": f"{humidity}%",
+                "wind": f"{wind_speed} m/s"
+            }
+            cached_weather_time = now
+            return cached_weather_dict
+    except Exception as e:
+        print(f"[Weather] Error: {e}")
+
+    cached_weather_dict = default_weather
+    cached_weather_time = now
+    return cached_weather_dict
+
+
+def get_weather() -> str:
+    """Return weather formatted for speech response."""
+    data = display_weather()
+    return f"Weather in {data['city']}: {data['temp']}, {data['description']} with humidity at {data['humidity']}."

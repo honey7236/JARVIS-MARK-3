@@ -95,14 +95,21 @@ def execute_automation(action: str, target: Optional[str] = None, parameters: Op
 
     # Reminders
     elif action_lower in ["reminder", "save_reminder", "set_reminder"]:
+        import re
         task = target_clean or params.get("task", "Reminder")
         time_input = params.get("time") or params.get("time_input", "")
+
         if not time_input:
-            import re
-            time_match = re.search(r'\b(\d{1,2}(?::\d{2})?\s*(?:am|pm|a\.m\.|p\.m\.))\b', task, re.IGNORECASE)
+            time_match = re.search(r'\b(?:at\s+|on\s+)?(\d{1,2}(?::\d{2})?\s*(?:am|pm|a\.m\.|p\.m\.))\b', task, re.IGNORECASE)
             if time_match:
                 time_input = time_match.group(1)
-                task = task.replace(time_input, "").strip()
+                task = task[:time_match.start()] + task[time_match.end():]
+
+        # Clean trailing and leading prepositions from task
+        task = re.sub(r'\b(?:remind me to|reminder for|reminder to|reminder|at|on|for)\b', '', task, flags=re.IGNORECASE).strip()
+        if not task:
+            task = "Reminder"
+
         if not time_input:
             return "Please specify a time for the reminder, for example 'at 5 pm'."
         return save_reminder(task, time_input)

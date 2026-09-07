@@ -82,6 +82,34 @@ def display_system_info_data():
 
 
 @eel.expose
+def display_weather_data():
+    """Returns weather telemetry for the HUD dashboard card."""
+    try:
+        from local.automation.system import display_weather
+        return display_weather()
+    except Exception as e:
+        print(f"[Eel] Error fetching weather: {e}")
+        return {
+            "city": "MALIBU",
+            "temp": "24°C",
+            "description": "CLEAR SKY",
+            "humidity": "45%",
+            "wind": "3.5 m/s"
+        }
+
+
+@eel.expose
+def get_weather_data():
+    return display_weather_data()
+
+
+@eel.expose
+def get_news_data():
+    """Returns placeholder for news widget since news scraping was retired."""
+    return "Global news search is available in real-time by asking Jarvis directly."
+
+
+@eel.expose
 def toggle_mic(muted: bool):
     """Toggle microphone mute state directly in-memory."""
     speech_to_text.is_mic_muted = muted
@@ -144,6 +172,9 @@ def get_api_keys():
         "GroqAPIKeys": [],
         "TavilyAPIKey": "",
         "OpenWeatherAPIKey": "",
+        "cohere": "",
+        "HuggingFaceAPIKey": "",
+        "GNewsAPIKey": "",
     }
 
     env_path = Path(".env")
@@ -160,8 +191,8 @@ def get_api_keys():
                     k, v = line.split("=", 1)
                     k, v = k.strip(), v.strip().strip("'\"")
 
-                    if k.startswith("GROQ_API_KEY"):
-                        if v:
+                    if k.startswith("GROQ_API_KEY") or k == "GroqAPIKey":
+                        if v and v not in keys["GroqAPIKeys"]:
                             keys["GroqAPIKeys"].append(v)
                     elif k == "TAVILY_API_KEY":
                         keys["TavilyAPIKey"] = v
@@ -175,43 +206,43 @@ def get_api_keys():
 
 @eel.expose
 def save_api_keys(updated_keys):
-    """Saves updated keys to .env."""
-    env_path = Path(".env")
-    if not env_path.exists():
-        env_path = BASE_DIR.parent / ".env"
+    """Saves updated keys to both root .env and brain/.env."""
+    env_paths = [Path(".env"), BASE_DIR.parent / ".env", BASE_DIR.parent / "brain" / ".env"]
 
     try:
-        existing_lines = []
-        if env_path.exists():
-            with open(env_path, "r", encoding="utf-8") as f:
-                for line in f:
-                    stripped = line.strip()
-                    if not stripped or stripped.startswith("#"):
-                        existing_lines.append(line)
-                        continue
-                    if "=" in line:
-                        name = stripped.split("=", 1)[0].strip()
-                        if not (name.startswith("GROQ_API_KEY") or name in ["TAVILY_API_KEY", "OpenWeatherAPIKey"]):
-                            existing_lines.append(line)
-
-        # Append new keys
         groq_keys = updated_keys.get("GroqAPIKeys", [])
-        for i, gk in enumerate(groq_keys):
-            gk = gk.strip()
-            if gk:
-                key_name = "GROQ_API_KEY" if i == 0 else f"GROQ_API_KEY_{i+1}"
-                existing_lines.append(f"{key_name}={gk}\n")
-
-        tavily_key = updated_keys.get("TavilyAPIKey", "").strip()
-        if tavily_key:
-            existing_lines.append(f"TAVILY_API_KEY={tavily_key}\n")
-
         weather_key = updated_keys.get("OpenWeatherAPIKey", "").strip()
-        if weather_key:
-            existing_lines.append(f"OpenWeatherAPIKey={weather_key}\n")
+        tavily_key = updated_keys.get("TavilyAPIKey", "").strip()
 
-        with open(env_path, "w", encoding="utf-8") as f:
-            f.writelines(existing_lines)
+        for env_path in env_paths:
+            existing_lines = []
+            if env_path.exists():
+                with open(env_path, "r", encoding="utf-8") as f:
+                    for line in f:
+                        stripped = line.strip()
+                        if not stripped or stripped.startswith("#"):
+                            existing_lines.append(line)
+                            continue
+                        if "=" in line:
+                            name = stripped.split("=", 1)[0].strip()
+                            if not (name.startswith("GROQ_API_KEY") or name == "GroqAPIKey" or name in ["TAVILY_API_KEY", "OpenWeatherAPIKey"]):
+                                existing_lines.append(line)
+
+            # Append keys
+            for i, gk in enumerate(groq_keys):
+                gk = gk.strip()
+                if gk:
+                    key_name = "GROQ_API_KEY" if i == 0 else f"GROQ_API_KEY_{i+1}"
+                    existing_lines.append(f"{key_name}={gk}\n")
+
+            if tavily_key:
+                existing_lines.append(f"TAVILY_API_KEY={tavily_key}\n")
+            if weather_key:
+                existing_lines.append(f"OpenWeatherAPIKey={weather_key}\n")
+
+            env_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(env_path, "w", encoding="utf-8") as f:
+                f.writelines(existing_lines)
 
         return {"success": True}
     except Exception as e:

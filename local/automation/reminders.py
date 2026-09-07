@@ -18,7 +18,8 @@ _reminder_lock = threading.Lock()
 
 
 def normalize_time_input(time_input: str) -> str:
-    """Normalize user time input string to standard format."""
+    """Normalize user time input string to standard uppercase format with space before AM/PM."""
+    import re
     time_input = time_input.lower().strip()
     replacements = {
         "p.m.": "pm",
@@ -27,13 +28,16 @@ def normalize_time_input(time_input: str) -> str:
     }
     for k, v in replacements.items():
         time_input = time_input.replace(k, v)
-    return " ".join(time_input.split())
+
+    # Insert space before am/pm if omitted e.g. '3pm' -> '3 pm'
+    time_input = re.sub(r'(\d+)\s*(am|pm)\b', r'\1 \2', time_input)
+    return " ".join(time_input.split()).upper()
 
 
 def parse_time(time_input: str):
     """Parse time string into datetime object."""
     normalized = normalize_time_input(time_input)
-    formats = ["%I:%M %p", "%I %p"]
+    formats = ["%I:%M %p", "%I %p", "%H:%M"]
     for fmt in formats:
         try:
             return datetime.strptime(normalized, fmt)
