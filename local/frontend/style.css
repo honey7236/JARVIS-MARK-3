@@ -102,49 +102,41 @@ body {
 }
 
 /* ------------------------------------------------------------
-   PILL-SHAPED CHAT CAPSULE (Ultra-Clean Transparent Glass)
+   PILL-SHAPED CHAT CAPSULE (Modern, clean, floating glassmorphism)
    ------------------------------------------------------------ */
 .hud-pill-capsule {
 	width: 100%;
 	display: flex;
 	align-items: center;
 	gap: 12px;
-	/* Ultra-transparent crystalline glass aesthetic */
-	background: rgba(255, 255, 255, 0.04);
-	border: 1px solid rgba(255, 255, 255, 0.14);
-	border-top: 1px solid rgba(255, 255, 255, 0.35);
-	border-left: 1px solid rgba(255, 255, 255, 0.22);
+	/* Authentic Glassmorphism: semi-translucent dark glass with glossy highlight */
+	background: linear-gradient(
+		135deg,
+		rgba(25, 20, 15, 0.65) 0%,
+		rgba(10, 8, 6, 0.75) 100%
+	);
+	border: 1px solid rgba(255, 180, 50, 0.22);
+	border-top: 1px solid rgba(255, 255, 255, 0.25);
+	border-left: 1px solid rgba(255, 255, 255, 0.15);
 	border-radius: 9999px;
 	padding: 7px 9px 7px 20px;
 	box-shadow: 
-		0 16px 40px rgba(0, 0, 0, 0.45),
-		0 4px 12px rgba(0, 0, 0, 0.3),
-		inset 0 1px 2px rgba(255, 255, 255, 0.25),
-		inset 0 -1px 2px rgba(0, 0, 0, 0.3),
-		0 0 15px rgba(255, 166, 0, 0.05);
-	backdrop-filter: blur(24px) saturate(190%) contrast(105%);
-	-webkit-backdrop-filter: blur(24px) saturate(190%) contrast(105%);
-	transition: all 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
-}
-
-.hud-pill-capsule:hover {
-	background: rgba(255, 255, 255, 0.06);
-	border-color: rgba(255, 255, 255, 0.22);
-	border-top-color: rgba(255, 255, 255, 0.45);
-	box-shadow: 
-		0 20px 48px rgba(0, 0, 0, 0.55),
-		inset 0 1px 2px rgba(255, 255, 255, 0.35),
-		0 0 20px rgba(255, 166, 0, 0.1);
+		0 20px 50px rgba(0, 0, 0, 0.8),
+		0 4px 16px rgba(0, 0, 0, 0.5),
+		inset 0 1px 1px rgba(255, 255, 255, 0.18),
+		0 0 20px rgba(255, 166, 0, 0.08);
+	backdrop-filter: blur(28px) saturate(180%);
+	-webkit-backdrop-filter: blur(28px) saturate(180%);
+	transition: border-color 0.25s, box-shadow 0.25s, transform 0.15s;
 }
 
 .hud-pill-capsule:focus-within {
-	background: rgba(255, 255, 255, 0.08);
-	border-color: rgba(255, 175, 20, 0.5);
-	border-top-color: rgba(255, 225, 130, 0.75);
+	border-color: rgba(255, 175, 20, 0.65);
+	border-top-color: rgba(255, 220, 120, 0.85);
 	box-shadow: 
-		0 24px 56px rgba(0, 0, 0, 0.7),
-		inset 0 1px 2px rgba(255, 255, 255, 0.4),
-		0 0 25px rgba(255, 166, 0, 0.3);
+		0 24px 60px rgba(0, 0, 0, 0.9),
+		inset 0 1px 2px rgba(255, 255, 255, 0.3),
+		0 0 28px rgba(255, 166, 0, 0.35);
 }
 
 /* Input Form & Field */
