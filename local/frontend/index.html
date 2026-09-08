@@ -22,14 +22,6 @@
 
 				<!-- Floating Pill-Shaped Chat Capsule -->
 				<div class="hud-pill-capsule" id="dialogue-card">
-					<!-- Left Add Action Button -->
-					<button type="button" class="capsule-btn capsule-btn-left" title="Add / Options">
-						<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
-							<line x1="12" y1="5" x2="12" y2="19"></line>
-							<line x1="5" y1="12" x2="19" y2="12"></line>
-						</svg>
-					</button>
-
 					<!-- Input Form -->
 					<form id="hud-input-form" class="capsule-input-form" onsubmit="return false;">
 						<input
@@ -41,34 +33,16 @@
 						/>
 					</form>
 
-					<!-- Status indicator dot -->
-					<div class="capsule-status-dot" id="status-dot" title="JARVIS Ready"></div>
+					<!-- Online / Ready status indicator dot -->
+					<div class="capsule-status-dot online" id="status-dot" title="JARVIS Online"></div>
 
-					<!-- 'Think' badge -->
-					<div class="capsule-pill-badge" id="hud-think-badge" title="Deep Reasoning Model">
-						<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-							<path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96.44 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.24 2.5 2.5 0 0 1 4.44-2.04z"></path>
-							<path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96.44 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.24 2.5 2.5 0 0 0-4.44-2.04z"></path>
-						</svg>
-						<span id="status-text">Think</span>
-					</div>
-
-					<!-- Microphone Toggle Button -->
-					<button id="btn-mic" class="capsule-btn capsule-btn-icon mic-on" title="Click to mute/unmute voice recognition">
-						<svg class="mic-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+					<!-- Themed Microphone / Action Control Button -->
+					<button id="btn-mic" class="capsule-mic-btn mic-on" title="Click to mute/unmute voice recognition">
+						<svg class="mic-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
 							<path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
 							<path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
 							<line x1="12" y1="19" x2="12" y2="23"></line>
 							<line x1="8" y1="23" x2="16" y2="23"></line>
-						</svg>
-					</button>
-
-					<!-- Execution / Audio waveform action button (Glowing blue pill/circle) -->
-					<button type="submit" id="btn-submit" class="capsule-action-btn" title="Execute / Send">
-						<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
-							<line x1="12" y1="4" x2="12" y2="20"></line>
-							<line x1="7" y1="9" x2="7" y2="15"></line>
-							<line x1="17" y1="8" x2="17" y2="16"></line>
 						</svg>
 					</button>
 				</div>

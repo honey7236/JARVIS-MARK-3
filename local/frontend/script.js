@@ -952,33 +952,17 @@
     var statusDotEl  = document.getElementById('status-dot');
 
     if (statusTextEl) {
-      if (currentStatus.indexOf("listening") !== -1) {
-        statusTextEl.textContent = "Listening";
-      } else if (currentStatus.indexOf("thinking") !== -1) {
-        statusTextEl.textContent = "Thinking";
-      } else if (currentStatus.indexOf("speaking") !== -1 || currentStatus.indexOf("answering") !== -1) {
-        statusTextEl.textContent = "Speaking";
-      } else {
-        statusTextEl.textContent = "Think";
-      }
+      statusTextEl.textContent = status;
     }
 
+    // The green dot indicates Online / Ready
     if (statusDotEl) {
-      if (currentStatus.indexOf("listening") !== -1) {
-        statusDotEl.style.background = "#00f0ff";
-        statusDotEl.style.boxShadow  = "0 0 8px #00f0ff";
-      } else if (currentStatus.indexOf("thinking") !== -1) {
-        statusDotEl.style.background = "#ffcc00";
-        statusDotEl.style.boxShadow  = "0 0 8px #ffcc00";
-      } else if (currentStatus.indexOf("answering") !== -1 || currentStatus.indexOf("speaking") !== -1) {
-        statusDotEl.style.background = "#ff6600";
-        statusDotEl.style.boxShadow  = "0 0 8px #ff6600";
-      } else if (currentStatus.indexOf("muted") !== -1) {
-        statusDotEl.style.background = "#666666";
-        statusDotEl.style.boxShadow  = "none";
+      if (currentStatus.indexOf("offline") !== -1 || currentStatus.indexOf("disconnected") !== -1) {
+        statusDotEl.classList.add('offline');
+        statusDotEl.title = "JARVIS Offline";
       } else {
-        statusDotEl.style.background = "#30d158";
-        statusDotEl.style.boxShadow  = "0 0 8px #30d158";
+        statusDotEl.classList.remove('offline');
+        statusDotEl.title = "JARVIS Online";
       }
     }
   }
