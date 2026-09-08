@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>J.A.R.V.I.S. MARK III // Holographic HUD</title>
+		<link rel="stylesheet" href="style.css" />
+		<link rel="preconnect" href="https://fonts.googleapis.com">
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+		<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;800;900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
+	</head>
+	<body>
+		<!-- 3D WebGL Canvas Container -->
+		<div id="webgl-container"></div>
+
+		<!-- Holographic HUD Overlay -->
+		<div id="hud-overlay">
+			<!-- Top Header Telemetry -->
+			<header class="hud-header">
+				<div class="hud-brand">
+					<div class="brand-title">J.A.R.V.I.S.</div>
+					<div class="brand-subtitle">MARK III // NEURAL FUSION CORE</div>
+				</div>
+				<div class="hud-status-badge">
+					<span class="status-pulse" id="status-dot"></span>
+					<span class="status-label" id="status-text">ONLINE // STANDBY</span>
+				</div>
+				<div class="hud-telemetry">
+					<div id="hud-clock">00:00:00</div>
+					<div id="hud-date">---</div>
+				</div>
+			</header>
+
+			<!-- Center Interactive Subtitle & Response Card -->
+			<div class="dialogue-container" id="dialogue-container">
+				<div class="dialogue-card" id="dialogue-card">
+					<div class="dialogue-header">
+						<span class="dialogue-dot"></span>
+						<span class="dialogue-speaker" id="dialogue-speaker">JARVIS</span>
+					</div>
+					<div class="dialogue-body" id="dialogue-text">
+						Systems online. Microservice matrix operational. Ready for command, Sir.
+					</div>
+				</div>
+			</div>
+
+			<!-- Bottom Command & Control Bar -->
+			<footer class="hud-footer">
+				<!-- Microphone Toggle -->
+				<button id="btn-mic" class="hud-mic-btn mic-on" title="Click to mute/unmute voice recognition">
+					<svg class="mic-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+						<path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+						<path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+						<line x1="12" y1="19" x2="12" y2="23"></line>
+						<line x1="8" y1="23" x2="16" y2="23"></line>
+					</svg>
+					<span id="mic-text">VOICE ACTIVE</span>
+				</button>
+
+				<!-- Text Command Input Bar -->
+				<form id="hud-input-form" class="hud-input-form" onsubmit="return false;">
+					<input
+						type="text"
+						id="hud-input"
+						class="hud-input"
+						placeholder="Speak or enter command (e.g. 'open chrome', 'what is the weather?')..."
+						autocomplete="off"
+					/>
+					<button type="submit" id="btn-submit" class="hud-submit-btn">
+						<span>EXECUTE</span>
+						<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+							<polyline points="9 18 15 12 9 6"></polyline>
+						</svg>
+					</button>
+				</form>
+			</footer>
+		</div>
+
+		<!-- Eel Bridge (serves dynamic /eel.js when launched by Python) -->
+		<script type="text/javascript" src="/eel.js"></script>
+
+		<!-- Local Three.js Engine & Hologram Script -->
+		<script src="three.min.js"></script>
+		<script src="script.js"></script>
+	</body>
+</html>

@@ -34,6 +34,32 @@ BRAIN_URL = env_vars.get("BRAIN_URL", "http://localhost:8000")
 current_session_id = None
 last_print_was_listening = False
 
+_dialogue_callback = None
+
+
+def set_dialogue_callback(cb):
+    """Register an optional callback for transcripts and replies (for GUI/HUD)."""
+    global _dialogue_callback
+    _dialogue_callback = cb
+
+
+def _notify_dialogue(speaker: str, text: str):
+    """Dispatch transcript or reply to registered callback or Eel GUI."""
+    if _dialogue_callback:
+        try:
+            _dialogue_callback(speaker, text)
+            return
+        except Exception:
+            pass
+    try:
+        import eel
+        if speaker.lower() in ["user", (Username or "").lower()]:
+            eel.displayUserTranscript(speaker, text)
+        else:
+            eel.displayAssistantResponse(speaker, text)
+    except Exception:
+        pass
+
 
 def _offline_fallback(query: str, enable_speech: bool = True) -> bool:
     """
@@ -68,12 +94,14 @@ def _offline_fallback(query: str, enable_speech: bool = True) -> bool:
 
     if result:
         print(f"[{Assistantname} (Offline)] : {result}")
+        _notify_dialogue(Assistantname, result)
         if enable_speech:
             speak(result)
         return True
     else:
         msg = "The Brain intelligence service is unreachable. Please verify python run.py is running in brain."
         print(f"[{Assistantname}] : {msg}")
+        _notify_dialogue(Assistantname, msg)
         if enable_speech:
             speak(msg)
         return False
@@ -90,6 +118,7 @@ def process_query(query: str, enable_speech: bool = True) -> bool:
         return False
 
     print(f"\n{Username} : {query}")
+    _notify_dialogue(Username, query)
     SetAssistantStatus("Thinking...")
 
     # Call Brain's POST /intent endpoint
@@ -120,12 +149,14 @@ def process_query(query: str, enable_speech: bool = True) -> bool:
                 if result == "exit":
                     farewell = "Goodbye sir. Shutting down system."
                     print(f"{Assistantname} : {farewell}")
+                    _notify_dialogue(Assistantname, farewell)
                     if enable_speech:
                         speak(farewell)
                     os._exit(0)
 
                 if result:
                     print(f"{Assistantname} : {result}")
+                    _notify_dialogue(Assistantname, result)
                     if enable_speech:
                         speak(result)
                 return True
@@ -133,6 +164,7 @@ def process_query(query: str, enable_speech: bool = True) -> bool:
             elif intent_type in ["chat", "realtime"]:
                 answer = data.get("response", "I am unable to answer that at the moment.")
                 print(f"{Assistantname} : {answer}")
+                _notify_dialogue(Assistantname, answer)
                 if enable_speech:
                     speak(answer)
                 return True

@@ -1,12 +1,13 @@
 """
 JARVIS MARK III LAUNCHER
 ========================
-Starts the Brain FastAPI microservice and launches the CLI Agent.
+Starts the Holographic 3D UI Frontend while running the full Brain microservice
+and Voice Recognition / Desktop Automation system in the background.
 
 Usage:
-  python run_jarvis.py          # Interactive CLI Agent (Text & Voice)
-  python run_jarvis.py --voice  # Continuous Voice Loop mode
-  python run_jarvis.py --brain  # Brain microservice only (http://localhost:8000)
+  python run_jarvis.py          # Holographic 3D Cybernetic UI (Frontend + Background Backend)
+  python run_jarvis.py --cli    # Interactive Terminal CLI Agent
+  python run_jarvis.py --brain  # Brain microservice standalone (http://localhost:8000)
 """
 
 import sys
@@ -21,8 +22,7 @@ BRAIN_DIR = ROOT_DIR / "brain"
 
 def main():
     parser = argparse.ArgumentParser(description="JARVIS Mark III Launcher")
-    parser.add_argument("--voice", action="store_true", help="Launch in hands-free voice loop mode")
-    parser.add_argument("--mute", action="store_true", help="Disable voice audio responses")
+    parser.add_argument("--cli", action="store_true", help="Launch in Interactive Terminal CLI mode")
     parser.add_argument("--brain", action="store_true", help="Launch Brain microservice standalone")
     args = parser.parse_args()
 
@@ -33,16 +33,15 @@ def main():
         subprocess.run([python_exe, "run.py"], cwd=str(BRAIN_DIR))
         return
 
-    # Delegate to jarvis_cli.py
-    cli_args = [python_exe, "jarvis_cli.py"]
-    if args.voice:
-        cli_args.append("--voice")
-    if args.mute:
-        cli_args.append("--mute")
-
     env = os.environ.copy()
     env["PYTHONPATH"] = str(ROOT_DIR)
-    subprocess.run(cli_args, cwd=str(ROOT_DIR), env=env)
+
+    if args.cli:
+        print("[Launcher] Launching Interactive Terminal CLI...")
+        subprocess.run([python_exe, "jarvis_cli.py"], cwd=str(ROOT_DIR), env=env)
+    else:
+        print("[Launcher] Starting Holographic 3D Frontend & Background Backend...")
+        subprocess.run([python_exe, "-m", "local.app"], cwd=str(ROOT_DIR), env=env)
 
 
 if __name__ == "__main__":
