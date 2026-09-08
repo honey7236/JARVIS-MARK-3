@@ -933,16 +933,11 @@
 
   // HUD Dialogue Updates
   function setDialogue(speaker, text) {
-    var speakerEl = document.getElementById('dialogue-speaker');
-    var textEl    = document.getElementById('dialogue-text');
-    var cardEl    = document.getElementById('dialogue-card');
+    var textEl = document.getElementById('dialogue-text');
+    var cardEl = document.getElementById('dialogue-card');
 
-    if (speakerEl) {
-      speakerEl.textContent = speaker.toUpperCase();
-      if (textEl) textEl.textContent = text;
-    } else if (textEl) {
-      var spk = speaker ? speaker.toUpperCase() + ": " : "";
-      textEl.textContent = spk + text;
+    if (textEl) {
+      textEl.textContent = text;
     }
     if (cardEl) {
       cardEl.style.transform = 'scale(1.01)';
@@ -957,27 +952,33 @@
     var statusDotEl  = document.getElementById('status-dot');
 
     if (statusTextEl) {
-      var clean = status.toUpperCase();
-      if (clean === "ACTIVE" || clean === "IDLE") clean = "ONLINE // STANDBY";
-      statusTextEl.textContent = clean;
+      if (currentStatus.indexOf("listening") !== -1) {
+        statusTextEl.textContent = "Listening";
+      } else if (currentStatus.indexOf("thinking") !== -1) {
+        statusTextEl.textContent = "Thinking";
+      } else if (currentStatus.indexOf("speaking") !== -1 || currentStatus.indexOf("answering") !== -1) {
+        statusTextEl.textContent = "Speaking";
+      } else {
+        statusTextEl.textContent = "Think";
+      }
     }
 
     if (statusDotEl) {
       if (currentStatus.indexOf("listening") !== -1) {
-        statusDotEl.style.background = "#00ffcc";
-        statusDotEl.style.boxShadow  = "0 0 14px #00ffcc";
+        statusDotEl.style.background = "#00f0ff";
+        statusDotEl.style.boxShadow  = "0 0 8px #00f0ff";
       } else if (currentStatus.indexOf("thinking") !== -1) {
-        statusDotEl.style.background = "#ffbb00";
-        statusDotEl.style.boxShadow  = "0 0 14px #ffbb00";
+        statusDotEl.style.background = "#ffcc00";
+        statusDotEl.style.boxShadow  = "0 0 8px #ffcc00";
       } else if (currentStatus.indexOf("answering") !== -1 || currentStatus.indexOf("speaking") !== -1) {
-        statusDotEl.style.background = "#ff5500";
-        statusDotEl.style.boxShadow  = "0 0 14px #ff5500";
+        statusDotEl.style.background = "#ff6600";
+        statusDotEl.style.boxShadow  = "0 0 8px #ff6600";
       } else if (currentStatus.indexOf("muted") !== -1) {
         statusDotEl.style.background = "#666666";
         statusDotEl.style.boxShadow  = "none";
       } else {
-        statusDotEl.style.background = "var(--amber-bright)";
-        statusDotEl.style.boxShadow  = "0 0 10px var(--amber-bright)";
+        statusDotEl.style.background = "#30d158";
+        statusDotEl.style.boxShadow  = "0 0 8px #30d158";
       }
     }
   }
@@ -1017,22 +1018,35 @@
   // Text Command Input Submission
   var inputForm = document.getElementById('hud-input-form');
   var inputField = document.getElementById('hud-input');
+  var submitBtn = document.getElementById('btn-submit');
 
-  if (inputForm && inputField) {
+  function submitUserQuery() {
+    if (!inputField) return;
+    var query = inputField.value.trim();
+    if (!query) return;
+
+    // Display query on HUD
+    setDialogue("USER", query);
+    inputField.value = "";
+
+    // Send to Python backend
+    if (typeof eel !== "undefined" && eel.user_text_query) {
+      onStatusChange("Thinking...");
+      eel.user_text_query(query)();
+    }
+  }
+
+  if (inputForm) {
     inputForm.addEventListener('submit', function(e) {
       e.preventDefault();
-      var query = inputField.value.trim();
-      if (!query) return;
+      submitUserQuery();
+    });
+  }
 
-      // Display query on HUD
-      setDialogue("USER", query);
-      inputField.value = "";
-
-      // Send to Python backend
-      if (typeof eel !== "undefined" && eel.user_text_query) {
-        onStatusChange("Thinking...");
-        eel.user_text_query(query)();
-      }
+  if (submitBtn) {
+    submitBtn.addEventListener('click', function(e) {
+      e.preventDefault();
+      submitUserQuery();
     });
   }
 
