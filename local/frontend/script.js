@@ -153,6 +153,7 @@
   }
 
   var hologramRoot = new THREE.Group();
+  hologramRoot.position.y = 36; // Shift orb slightly upward to clear bottom chat UI
   scene.add(hologramRoot);
 
   // ==========================================================================
@@ -801,8 +802,9 @@
     } else {
       var nx = (e.clientX - window.innerWidth / 2)  / (window.innerWidth / 2);
       var ny = (e.clientY - window.innerHeight / 2) / (window.innerHeight / 2);
+      var targetY = 36 + (-ny * 12);
       hologramRoot.position.x += (nx * 12 - hologramRoot.position.x) * 0.05;
-      hologramRoot.position.y += (-ny * 12 - hologramRoot.position.y) * 0.05;
+      hologramRoot.position.y += (targetY - hologramRoot.position.y) * 0.05;
     }
   });
   window.addEventListener('pointerup',     function() { isDragging = false; });
