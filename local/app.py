@@ -114,6 +114,17 @@ def on_status_change(status: str):
 
 speech_to_text.set_status_callback(on_status_change)
 
+import local.voice.text_to_speech as text_to_speech
+
+def on_audio_level(level: float):
+    """Forward real-time audio pitch/energy level to Eel UI for core reactivity."""
+    try:
+        eel.updateAudioLevel(float(level))
+    except Exception:
+        pass
+
+text_to_speech.set_audio_level_callback(on_audio_level)
+
 
 def on_dialogue_event(speaker: str, text: str):
     """Forward speech transcript or assistant answer to Eel HUD subtitle card."""

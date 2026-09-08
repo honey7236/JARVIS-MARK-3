@@ -22,6 +22,27 @@ except ImportError:
     except ImportError:
         def SetAssistantStatus(status): pass
 
+# Callback for broadcasting real-time audio pitch/amplitude level to HUD
+_audio_level_callback = None
+
+def set_audio_level_callback(cb):
+    """Register callback to stream audio pitch/energy level (0.0 to 1.0) to UI."""
+    global _audio_level_callback
+    _audio_level_callback = cb
+
+def _notify_audio_level(level: float):
+    if _audio_level_callback:
+        try:
+            _audio_level_callback(level)
+            return
+        except Exception:
+            pass
+    try:
+        import eel
+        eel.updateAudioLevel(level)
+    except Exception:
+        pass
+
 # Load environment variables
 env_vars = dotenv_values(".env")
 AssistantVoice = env_vars.get("AssistantVoice") or env_vars.get("TTS_VOICE") or "en-CA-LiamNeural"
@@ -74,11 +95,19 @@ def TTS(Text: str, func=lambda r=None: True) -> bool:
             pygame.mixer.music.load(file_path)
             pygame.mixer.music.play()
 
+            step = 0
             while pygame.mixer.music.get_busy():
                 if func() is False:
                     break
-                pygame.time.Clock().tick(10)
+                step += 1
+                # Modulate energy/pitch dynamically based on waveform rhythms
+                import math
+                speech_energy = 0.35 + 0.45 * math.sin(step * 0.7) + 0.2 * math.cos(step * 1.3)
+                speech_energy = max(0.1, min(1.0, speech_energy))
+                _notify_audio_level(speech_energy)
+                pygame.time.Clock().tick(20)
 
+            _notify_audio_level(0.0)
             return True
 
         except Exception as e:
@@ -90,6 +119,7 @@ def TTS(Text: str, func=lambda r=None: True) -> bool:
                 return False
 
         finally:
+            _notify_audio_level(0.0)
             try:
                 func(False)
                 if pygame.mixer.get_init():

@@ -153,7 +153,6 @@
   }
 
   var hologramRoot = new THREE.Group();
-  hologramRoot.position.y = 36; // Shift orb slightly upward to clear bottom chat UI
   scene.add(hologramRoot);
 
   // ==========================================================================
@@ -802,9 +801,8 @@
     } else {
       var nx = (e.clientX - window.innerWidth / 2)  / (window.innerWidth / 2);
       var ny = (e.clientY - window.innerHeight / 2) / (window.innerHeight / 2);
-      var targetY = 36 + (-ny * 12);
       hologramRoot.position.x += (nx * 12 - hologramRoot.position.x) * 0.05;
-      hologramRoot.position.y += (targetY - hologramRoot.position.y) * 0.05;
+      hologramRoot.position.y += (-ny * 12 - hologramRoot.position.y) * 0.05;
     }
   });
   window.addEventListener('pointerup',     function() { isDragging = false; });
@@ -825,60 +823,56 @@
   var clock = new THREE.Clock();
   var currentStatus = "standby";
 
+  // Real-time audio pitch/amplitude level (0.0 = silent/steady, 1.0 = peak speech pitch)
+  var audioPitchLevel = 0.0;
+  var smoothAudioLevel = 0.0;
+
+  function setAudioLevel(level) {
+    audioPitchLevel = Math.max(0.0, Math.min(1.0, level || 0.0));
+  }
+
   function animate() {
     requestAnimationFrame(animate);
     var delta = clock.getDelta();
     var t     = clock.getElapsedTime();
 
-    // Dynamically modulate rotation and pulse speeds based on assistant state
-    var speedMult = 1.0;
-    var pulseFreq = 3.5;
-    var pulseAmp  = 0.07;
-
-    if (currentStatus.indexOf("listening") !== -1) {
-      speedMult = 1.4;
-      pulseFreq = 7.0;
-      pulseAmp  = 0.12;
-    } else if (currentStatus.indexOf("thinking") !== -1 || currentStatus.indexOf("translating") !== -1) {
-      speedMult = 2.6;
-      pulseFreq = 10.0;
-      pulseAmp  = 0.16;
-    } else if (currentStatus.indexOf("answering") !== -1 || currentStatus.indexOf("speaking") !== -1) {
-      speedMult = 0.9;
-      pulseFreq = 5.2;
-      pulseAmp  = 0.22;
-    } else if (currentStatus.indexOf("muted") !== -1) {
-      speedMult = 0.35;
-      pulseFreq = 1.5;
-      pulseAmp  = 0.03;
+    // Smoothly interpolate audio level (fast attack, smooth exponential decay)
+    if (audioPitchLevel > smoothAudioLevel) {
+      smoothAudioLevel += (audioPitchLevel - smoothAudioLevel) * 0.45;
+    } else {
+      smoothAudioLevel += (audioPitchLevel - smoothAudioLevel) * 0.12;
     }
 
-    // 1. Outer Sphere Shell — planetary axis rotation
-    outerSphereGroup.rotation.y += delta * 0.22 * speedMult;
+    // Steady, smooth, uniform rotation speeds (no jarring speed spikes)
+    var speedMult = 1.0;
 
-    // 2. Inner Gyroscopic Rings — independent multi-axis rotation
-    coronaGroup.rotation.z += delta * 0.14 * speedMult;
-    gyroRing1.rotation.y   += delta * 0.28 * speedMult;
-    gyroRing1.rotation.x   += delta * 0.06 * speedMult;
-    gyroRing2.rotation.z   -= delta * 0.32 * speedMult;
-    gyroRing2.rotation.x   -= delta * 0.08 * speedMult;
-    gyroRing3.rotation.y   += delta * 0.18 * speedMult;
-    gyroRing3.rotation.z   -= delta * 0.14 * speedMult;
-    ribbonMesh.rotation.z  += delta * 0.08 * speedMult;
+    // 1. Outer Sphere Shell — steady planetary axis rotation
+    outerSphereGroup.rotation.y += delta * 0.18 * speedMult;
 
-    // 3. 3D Spherical Core Cage Rotation
-    coreSphereCage.rotation.y += delta * 0.45 * speedMult;
-    coreSphereCage.rotation.x += delta * 0.22 * speedMult;
+    // 2. Inner Gyroscopic Rings — independent smooth multi-axis rotation
+    coronaGroup.rotation.z += delta * 0.12 * speedMult;
+    gyroRing1.rotation.y   += delta * 0.22 * speedMult;
+    gyroRing1.rotation.x   += delta * 0.05 * speedMult;
+    gyroRing2.rotation.z   -= delta * 0.26 * speedMult;
+    gyroRing2.rotation.x   -= delta * 0.06 * speedMult;
+    gyroRing3.rotation.y   += delta * 0.15 * speedMult;
+    gyroRing3.rotation.z   -= delta * 0.11 * speedMult;
+    ribbonMesh.rotation.z  += delta * 0.07 * speedMult;
 
-    // 4. Central Core Pulse
-    var pulse = 1 + Math.sin(t * pulseFreq) * pulseAmp + Math.sin(t * 11.3) * 0.02;
-    coreGroup.scale.set(pulse, pulse, pulse);
-    coreGroup.rotation.z -= delta * 0.12 * speedMult;
+    // 3. 3D Spherical Core Cage Rotation (smooth and steady)
+    coreSphereCage.rotation.y += delta * 0.35 * speedMult;
+    coreSphereCage.rotation.x += delta * 0.18 * speedMult;
+
+    // 4. Central Core Scale — completely steady (1.0) with zero idle bouncing;
+    // reacts dynamically ONLY when JARVIS speaks proportionally to audio pitch/energy
+    var speechScale = 1.0 + smoothAudioLevel * 0.28;
+    coreGroup.scale.set(speechScale, speechScale, speechScale);
+    coreGroup.rotation.z -= delta * 0.10 * speedMult;
 
     // 5. Inertia damping
     hologramRoot.rotation.y += (targetRootRotation.y - hologramRoot.rotation.y) * 0.08;
     hologramRoot.rotation.x += (targetRootRotation.x - hologramRoot.rotation.x) * 0.08;
-    if (!isDragging) targetRootRotation.y += delta * 0.04 * speedMult;
+    if (!isDragging) targetRootRotation.y += delta * 0.03 * speedMult;
 
     // 6. Embers update
     var epos = emberGeom.attributes.position;
@@ -1054,6 +1048,12 @@
     eel.expose(displayAssistantResponse);
     function displayAssistantResponse(speaker, text) {
       setDialogue(speaker || "JARVIS", text);
+    }
+
+    // Expose audio pitch / energy receiver for voice speech playback
+    eel.expose(updateAudioLevel);
+    function updateAudioLevel(level) {
+      setAudioLevel(level);
     }
 
     // Fetch initial state from Python
