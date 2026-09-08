@@ -903,10 +903,11 @@
   // 7. HOLOGRAPHIC HUD CONTROLLER & EEL INTEGRATION
   // ==========================================================================
 
-  // Live Clock & Date Telemetry
+  // Live Clock & Date Telemetry (if present in DOM)
   function initClock() {
     var clockEl = document.getElementById('hud-clock');
     var dateEl  = document.getElementById('hud-date');
+    if (!clockEl && !dateEl) return;
 
     function update() {
       var now = new Date();
