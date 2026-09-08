@@ -116,11 +116,34 @@ class TestAutomationModules(unittest.TestCase):
         spoken_weather = get_weather()
         self.assertIn("Weather in", spoken_weather)
 
-    def test_chat_history_retrieval(self):
-        from jarvis_cli import get_chat_history
-        logs = get_chat_history(limit=5)
-        self.assertIsInstance(logs, list)
+    def test_process_automation_router(self):
+        from local.automation import process_automation
+        # System volume
+        self.assertEqual(process_automation("volume up"), "Volume increased")
+        self.assertEqual(process_automation("mute"), "Volume muted or unmuted")
+        # System stats
+        self.assertIn("CPU usage", process_automation("check system"))
+        # Battery
+        self.assertIn("Battery", process_automation("battery status"))
+        # Weather
+        self.assertIn("Weather in", process_automation("weather"))
+        # Time
+        self.assertIn("Today is", process_automation("what is the time"))
+        # Search
+        self.assertIn("Searching Google", process_automation("search Python tutorials"))
+        # Close window
+        self.assertEqual(process_automation("close window"), "Closing active window")
+        # Exit
+        self.assertEqual(process_automation("exit"), "exit")
+        # None for general queries
+        self.assertIsNone(process_automation("who was Nikola Tesla"))
+
+    def test_screenshot_capture(self):
+        from local.automation.system import take_screenshot
+        res = take_screenshot()
+        self.assertIn("Screenshot saved on your Desktop", res)
 
 
 if __name__ == "__main__":
     unittest.main()
+

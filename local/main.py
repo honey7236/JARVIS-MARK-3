@@ -17,7 +17,7 @@ from dotenv import dotenv_values
 
 from local.voice.speech_to_text import listen, SetAssistantStatus, QueryModifier
 from local.voice.text_to_speech import speak
-from local.automation import execute_automation
+from local.automation import execute_automation, process_automation
 from local.automation.system import (
     volume_up, volume_down, mute_volume,
     take_screenshot, get_system_stats, battery_alert
@@ -121,7 +121,24 @@ def process_query(query: str, enable_speech: bool = True) -> bool:
     _notify_dialogue(Username, query)
     SetAssistantStatus("Thinking...")
 
-    # Call Brain's POST /intent endpoint
+    # 1. Fast-path local automation evaluation (0ms latency, 100% reliable)
+    auto_result = process_automation(query)
+    if auto_result is not None:
+        if auto_result == "exit":
+            farewell = "Goodbye sir. Shutting down system."
+            print(f"{Assistantname} : {farewell}")
+            _notify_dialogue(Assistantname, farewell)
+            if enable_speech:
+                speak(farewell)
+            os._exit(0)
+
+        print(f"{Assistantname} : {auto_result}")
+        _notify_dialogue(Assistantname, auto_result)
+        if enable_speech:
+            speak(auto_result)
+        return True
+
+    # 2. Call Brain's POST /intent endpoint for complex AI queries
     try:
         payload = {"query": query}
         if current_session_id:

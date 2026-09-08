@@ -50,8 +50,8 @@ class QueryIntentSchema(BaseModel):
         description=(
             "For automation queries: one of "
             "['open_app', 'close_app', 'google_search', 'youtube_search', 'play_music', "
-            "'system_volume', 'take_screenshot', 'reminder', 'whatsapp', 'battery_status', "
-            "'system_stats', 'exit']"
+            "'system_volume', 'take_screenshot', 'reminder', 'weather', 'content', "
+            "'date_time', 'internet_status', 'battery_status', 'system_stats', 'exit']"
         )
     )
     target: Optional[str] = Field(
@@ -111,38 +111,65 @@ class IntentService:
         q = query.lower().strip()
 
         # Exit
-        if q in ["exit", "quit", "goodbye", "bye jarvis"]:
+        if q in ["exit", "quit", "goodbye", "bye jarvis", "close jarvis"]:
             return QueryIntentSchema(intent_type="automation", action="exit", target=None)
 
         # Screenshot
-        if "take a screenshot" in q or "take screenshot" in q:
+        if any(w in q for w in ["take a screenshot", "take screenshot", "capture screen", "screenshot"]):
             return QueryIntentSchema(intent_type="automation", action="take_screenshot", target=None)
 
         # Battery status
-        if "battery status" in q or "check battery" in q or "battery percentage" in q:
+        if any(w in q for w in ["battery status", "check battery", "battery percentage", "battery level", "how much battery"]):
             return QueryIntentSchema(intent_type="automation", action="battery_status", target=None)
 
         # System stats
-        if "check system" in q or "system stats" in q or "hardware status" in q:
+        if any(w in q for w in ["check system", "system stats", "hardware status", "system info", "hardware stats"]):
             return QueryIntentSchema(intent_type="automation", action="system_stats", target=None)
 
+        # Internet status
+        if any(w in q for w in ["internet status", "check internet", "is internet working", "check connection"]):
+            return QueryIntentSchema(intent_type="automation", action="internet_status", target=None)
+
+        # Weather
+        if "weather" in q and not any(w in q for w in ["what causes", "explain", "history"]):
+            return QueryIntentSchema(intent_type="automation", action="weather", target=None)
+
+        # Date and Time
+        if any(phrase in q for phrase in ["what is the time", "current time", "what time is it", "tell me the time", "what is today's date", "what is the date", "what date is it", "today's date", "what day is it"]):
+            return QueryIntentSchema(intent_type="automation", action="date_time", target=None)
+
         # Volume
-        if "volume up" in q or "increase volume" in q:
+        if any(w in q for w in ["volume up", "increase volume", "turn up volume"]):
             return QueryIntentSchema(intent_type="automation", action="system_volume", target="up")
-        if "volume down" in q or "decrease volume" in q or "lower volume" in q:
+        if any(w in q for w in ["volume down", "decrease volume", "lower volume", "turn down volume"]):
             return QueryIntentSchema(intent_type="automation", action="system_volume", target="down")
-        if "mute volume" in q or "unmute" in q or "mute" == q:
+        if any(w in q for w in ["mute volume", "unmute", "mute", "system mute"]):
             return QueryIntentSchema(intent_type="automation", action="system_volume", target="mute")
 
-        # Close App
+        # Close App / Window
+        if "close it" in q or q in ["close this", "close window", "close active window", "close tab"]:
+            return QueryIntentSchema(intent_type="automation", action="close_app", target="it")
         if q.startswith("close "):
             target = q.replace("close ", "", 1).strip()
             return QueryIntentSchema(intent_type="automation", action="close_app", target=target)
 
-        # Open App
+        # Open / Run App
         if q.startswith("open ") and not any(w in q for w in ["open source", "open minded", "open question"]):
             target = q.replace("open ", "", 1).strip()
             return QueryIntentSchema(intent_type="automation", action="open_app", target=target)
+        if q.startswith("run "):
+            target = q.replace("run ", "", 1).strip()
+            return QueryIntentSchema(intent_type="automation", action="open_app", target=target)
+
+        # Content Generation (save to Desktop and open in Notepad)
+        if q.startswith("content about ") or q.startswith("content on ") or q.startswith("content "):
+            import re
+            topic = re.sub(r'^content\s+(?:about\s+|on\s+)?', '', query, flags=re.IGNORECASE).strip()
+            return QueryIntentSchema(intent_type="automation", action="content", target=topic)
+        if q.startswith("write content about ") or q.startswith("write content on ") or q.startswith("generate content on "):
+            import re
+            topic = re.sub(r'^(?:write|generate)\s+content\s+(?:about\s+|on\s+)?', '', query, flags=re.IGNORECASE).strip()
+            return QueryIntentSchema(intent_type="automation", action="content", target=topic)
 
         # Play Music
         if q.startswith("play ") and len(q.split()) > 1:
@@ -159,8 +186,13 @@ class IntentService:
             target = q.replace("youtube search ", "", 1).strip()
             return QueryIntentSchema(intent_type="automation", action="youtube_search", target=target)
 
+        # General Search
+        if q.startswith("search "):
+            target = q.replace("search ", "", 1).strip()
+            return QueryIntentSchema(intent_type="automation", action="google_search", target=target)
+
         # Reminder
-        if q.startswith("remind me to ") or q.startswith("set reminder ") or q.startswith("set a reminder "):
+        if q.startswith("remind me to ") or q.startswith("set reminder ") or q.startswith("set a reminder ") or q.startswith("reminder "):
             return QueryIntentSchema(intent_type="automation", action="reminder", target=query)
 
         return None

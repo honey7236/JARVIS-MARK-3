@@ -51,29 +51,125 @@ def mute_volume() -> str:
 
 
 # ==========================================
-# Screenshot Automation
+# Screenshot Automation (Native GDI + PyAutoGUI)
 # ==========================================
+
+def _capture_gdi_screenshot(path_str: str) -> bool:
+    """Capture screen directly using Windows GDI, avoiding PIL ImageGrab limitations."""
+    try:
+        import ctypes
+        from ctypes import wintypes
+        user32 = ctypes.windll.user32
+        gdi32 = ctypes.windll.gdi32
+
+        try:
+            user32.SetProcessDPIAware()
+        except Exception:
+            pass
+
+        w = user32.GetSystemMetrics(0)
+        h = user32.GetSystemMetrics(1)
+
+        hdesktop = user32.GetDesktopWindow()
+        hdc = user32.GetWindowDC(hdesktop)
+        m_hdc = gdi32.CreateCompatibleDC(hdc)
+
+        hbmp = gdi32.CreateCompatibleBitmap(hdc, w, h)
+        hold = gdi32.SelectObject(m_hdc, hbmp)
+
+        SRCCOPY = 0x00CC0020
+        gdi32.BitBlt(m_hdc, 0, 0, w, h, hdc, 0, 0, SRCCOPY)
+
+        from PIL import Image
+
+        class BITMAPINFOHEADER(ctypes.Structure):
+            _fields_ = [
+                ('biSize', wintypes.DWORD),
+                ('biWidth', wintypes.LONG),
+                ('biHeight', wintypes.LONG),
+                ('biPlanes', wintypes.WORD),
+                ('biBitCount', wintypes.WORD),
+                ('biCompression', wintypes.DWORD),
+                ('biSizeImage', wintypes.DWORD),
+                ('biXPelsPerMeter', wintypes.LONG),
+                ('biYPelsPerMeter', wintypes.LONG),
+                ('biClrUsed', wintypes.DWORD),
+                ('biClrImportant', wintypes.DWORD)
+            ]
+
+        bmi = BITMAPINFOHEADER()
+        bmi.biSize = ctypes.sizeof(BITMAPINFOHEADER)
+        bmi.biWidth = w
+        bmi.biHeight = -h  # top-down
+        bmi.biPlanes = 1
+        bmi.biBitCount = 32
+        bmi.biCompression = 0
+
+        buf_size = w * h * 4
+        buf = ctypes.create_string_buffer(buf_size)
+        DIB_RGB_COLORS = 0
+        gdi32.GetDIBits(m_hdc, hbmp, 0, h, buf, ctypes.byref(bmi), DIB_RGB_COLORS)
+
+        gdi32.SelectObject(m_hdc, hold)
+        gdi32.DeleteObject(hbmp)
+        gdi32.DeleteDC(m_hdc)
+        user32.ReleaseDC(hdesktop, hdc)
+
+        img = Image.frombuffer('RGBA', (w, h), buf, 'raw', 'BGRA', 0, 1)
+        img.convert('RGB').save(path_str, 'PNG')
+        return os.path.exists(path_str) and os.path.getsize(path_str) > 0
+    except Exception as e:
+        print(f"[GDI Screenshot Error]: {e}")
+        return False
+
 
 def take_screenshot() -> str:
     """Capture screen and save to Desktop using OS-agnostic Path."""
     try:
         time.sleep(0.5)
-        # Check standard desktop locations
         home = Path.home()
-        desktop = home / "Desktop"
         onedrive_desktop = home / "OneDrive" / "Desktop"
+        desktop = home / "Desktop"
         folder = onedrive_desktop if onedrive_desktop.exists() else desktop
         folder.mkdir(parents=True, exist_ok=True)
 
         filename = f"screenshot_{int(time.time())}.png"
         path = folder / filename
 
-        screenshot = pyautogui.screenshot()
-        screenshot.save(str(path))
+        # Try native Windows GDI first (100% reliable)
+        saved = _capture_gdi_screenshot(str(path))
+        if not saved:
+            # Fallback to PyAutoGUI
+            screenshot = pyautogui.screenshot()
+            screenshot.save(str(path))
+
         return f"Screenshot saved on your Desktop as {filename}"
     except Exception as e:
         print(f"Screenshot Error: {e}")
         return "Unable to capture screenshot"
+
+
+def safe_notification(title: str, message: str, timeout: int = 5):
+    """Safely show desktop notification without crashing threads on Windows."""
+    try:
+        clean_title = title.replace("'", "''")
+        clean_msg = message.replace("'", "''")
+        ps_cmd = (
+            f"[reflection.assembly]::loadwithpartialname('System.Windows.Forms') | Out-Null; "
+            f"[reflection.assembly]::loadwithpartialname('System.Drawing') | Out-Null; "
+            f"$n = new-object system.windows.forms.notifyicon; "
+            f"$n.icon = [System.Drawing.SystemIcons]::Information; "
+            f"$n.visible = $true; "
+            f"$n.showballoontip({timeout * 1000}, '{clean_title}', '{clean_msg}', [system.windows.forms.tooltipicon]::Info)"
+        )
+        import subprocess
+        subprocess.Popen(['powershell', '-WindowStyle', 'Hidden', '-Command', ps_cmd], creationflags=0x08000000)
+    except Exception:
+        try:
+            from plyer import notification
+            notification.notify(title=title, message=message, timeout=timeout)
+        except Exception:
+            pass
 
 
 # ==========================================
@@ -142,10 +238,10 @@ def display_system_info() -> dict:
 
 def alert100():
     try:
-        notification.notify(
+        safe_notification(
             title="Battery Alert",
             message="Battery is fully charged. Please unplug the charger.",
-            timeout=1
+            timeout=5
         )
     except Exception as e:
         print(f"Notification Error: {e}")
@@ -343,6 +439,82 @@ def display_weather() -> dict:
 
 
 def get_weather() -> str:
-    """Return weather formatted for speech response."""
+    """Return weather formatted cleanly for speech and text display."""
     data = display_weather()
-    return f"Weather in {data['city']}: {data['temp']}, {data['description']} with humidity at {data['humidity']}."
+    clean_temp = str(data.get('temp', '')).replace('°C', ' degrees Celsius')
+    return f"Weather in {data['city']}: {clean_temp}, {data['description']} with humidity at {data['humidity']}."
+
+
+# ==========================================
+# Content Generation Automation
+# ==========================================
+
+def content_generation(topic: str) -> str:
+    """
+    Generate professional content on the given topic using the Brain microservice
+    or direct Groq API fallback, save it to Desktop, and launch in Notepad.
+    Ported from JARVIS-MARK-2 backend/automation.py.
+    """
+    if not topic or not topic.strip():
+        return "Please specify what topic you would like content written about."
+
+    clean_topic = topic.strip()
+    content = None
+
+    # 1. Try querying the Brain microservice
+    brain_url = env_vars.get("BRAIN_URL", "http://localhost:8000")
+    try:
+        res = requests.post(
+            f"{brain_url}/intent",
+            json={"query": f"Write a comprehensive, professional, well-structured content about: {clean_topic}"},
+            timeout=3.0
+        )
+        if res.status_code == 200:
+            data = res.json()
+            content = data.get("response")
+    except Exception:
+        pass
+
+    # 2. Fallback to direct Groq API call if Brain is offline
+    if not content:
+        groq_key = env_vars.get("GROQ_API_KEY") or env_vars.get("GroqAPIKey")
+        groq_model = env_vars.get("GROQ_MODEL", "qwen/qwen3.8-27b")
+        if groq_key:
+            try:
+                from groq import Groq
+                client = Groq(api_key=groq_key)
+                completion = client.chat.completions.create(
+                    model=groq_model,
+                    messages=[
+                        {"role": "system", "content": "You are J.A.R.V.I.S., a world-class executive research assistant. Produce detailed, high quality, professional content on the requested topic."},
+                        {"role": "user", "content": f"Write a comprehensive, professional response or content about: {clean_topic}"}
+                    ],
+                    temperature=0.7,
+                    max_tokens=2048
+                )
+                content = completion.choices[0].message.content
+            except Exception as e:
+                print(f"[Content Gen] Groq fallback error: {e}")
+
+    if not content:
+        content = f"J.A.R.V.I.S. Content Generation\nTopic: {clean_topic}\nDate: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\nUnable to reach AI intelligence backend to draft detailed text. Please ensure Brain server or Groq API is active."
+
+    # Save to Desktop as in Mark 2
+    try:
+        home = Path.home()
+        onedrive_desktop = home / "OneDrive" / "Desktop"
+        desktop = home / "Desktop"
+        folder = onedrive_desktop if onedrive_desktop.exists() else desktop
+        folder.mkdir(parents=True, exist_ok=True)
+
+        file_path = folder / "generated_content.txt"
+        with open(str(file_path), "w", encoding="utf-8") as f:
+            f.write(content)
+
+        import subprocess
+        subprocess.Popen(["notepad.exe", str(file_path)], creationflags=0x00000008, close_fds=True)
+        return f"Content about {clean_topic} generated and opened in Notepad"
+    except Exception as e:
+        print(f"[Content Gen] File save error: {e}")
+        return "Unable to save content to Notepad"
+

@@ -45,21 +45,27 @@ def open_app(app: str) -> str:
 
 
 def close_app(app: str) -> str:
-    """Close an application by name or close the current window if 'current' or 'it'."""
+    """Close an application by name or close the current window/tab via Alt+F4."""
     if not app:
         time.sleep(0.5)
         pyautogui.hotkey('alt', 'f4')
         return "Closing active window"
 
-    app_clean = app.lower().replace("close", "").replace("it", "").strip()
-    if not app_clean or app_clean in ["current", "window", "tab"]:
+    app_clean = app.lower().replace("close", "").strip()
+    
+    # Check if user wants to close the active/current window or tab
+    window_phrases = ["it", "this", "this window", "the window", "window", "tab", "the tab", "current", "active window", "current window"]
+    if not app_clean or app_clean in window_phrases:
         time.sleep(0.5)
         pyautogui.hotkey('alt', 'f4')
         return "Closing active window"
 
+    # Try closing installed application via AppOpener
     try:
         appclose(app_clean, match_closest=True, throw_error=True)
         return f"Closing {app_clean}"
     except Exception:
+        time.sleep(0.5)
         pyautogui.hotkey('alt', 'f4')
         return f"Attempted to close {app_clean}"
+

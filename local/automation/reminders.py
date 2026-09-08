@@ -9,7 +9,11 @@ import time
 import heapq
 import threading
 from datetime import datetime, timedelta
-from plyer import notification
+
+try:
+    from local.automation.system import safe_notification
+except ImportError:
+    def safe_notification(title, message, timeout=5): pass
 
 # Heap-based reminders: entries are (remind_time: datetime, task: str)
 reminders = []
@@ -97,7 +101,7 @@ def reminder_loop():
                 print(f"[Reminder] TTS error: {e}")
 
             try:
-                notification.notify(
+                safe_notification(
                     title="J.A.R.V.I.S. Reminder",
                     message=task,
                     timeout=10

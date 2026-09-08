@@ -1,11 +1,6 @@
-"""
-AUTOMATION DISPATCHER PACKAGE
-==============================
-Exposes unified execute_automation() dispatcher for local action execution.
-Routes intents dispatched from the Brain to modular automation handlers.
-"""
-
 from typing import Optional, Dict, Any
+import re
+import time
 
 from local.automation.apps import open_app, close_app
 from local.automation.web import open_website, google_search, youtube_search
@@ -13,11 +8,139 @@ from local.automation.system import (
     volume_up, volume_down, mute_volume,
     take_screenshot, get_system_stats, display_system_info,
     battery_alert, internet_status, get_date_time, greet_user,
+    get_weather, display_weather, content_generation,
     start_network_monitoring, get_cached_status
 )
 from local.automation.music import play_music_on_youtube
-from local.automation.whatsapp import send_whatsapp_instant
 from local.automation.reminders import save_reminder, start_reminder_thread
+
+
+def process_automation(command: str) -> Optional[str]:
+    """
+    Direct zero-latency automation router ported and enhanced from JARVIS-MARK-2 backend/automation.py.
+    Evaluates PC desktop commands instantly. Returns response string if handled, or None to pass to AI Brain.
+    (News and WhatsApp automations are excluded as requested).
+    """
+    if not command or not isinstance(command, str):
+        return None
+
+    c = command.strip()
+    q = c.lower()
+    if not q:
+        return None
+
+    # 1. Close application / active window
+    if "close it" in q or q in ["close this", "close window", "close active window", "close tab"]:
+        return close_app("it")
+    elif q.startswith("close "):
+        app_name = c[6:].strip()
+        return close_app(app_name)
+
+    # 2. Open / Run application or website
+    elif q.startswith("open "):
+        target = c[5:].strip()
+        # Avoid intercepting phrases like "open source"
+        if target.lower() not in ["source", "minded", "question"]:
+            return open_app(target)
+    elif q.startswith("run "):
+        target = c[4:].strip()
+        return open_app(target)
+
+    # 3. Google Search
+    elif q.startswith("google search "):
+        query = c[14:].strip()
+        return google_search(query)
+    elif q.startswith("google search"):
+        return "What should I search for on Google?"
+
+    # 4. YouTube Search
+    elif q.startswith("youtube search "):
+        query = c[15:].strip()
+        return youtube_search(query)
+    elif q.startswith("youtube search"):
+        return "What should I search for on YouTube?"
+
+    # 5. General Web Search
+    elif q.startswith("search "):
+        query = c[7:].strip()
+        return google_search(query)
+
+    # 6. Play Music on YouTube / Library
+    elif q.startswith("play "):
+        song = c[5:].strip()
+        if song:
+            return play_music_on_youtube(song)
+
+    # 7. System Volume Controls
+    elif q.startswith("system volume ") or q.startswith("volume ") or any(w in q for w in ["volume up", "increase volume", "turn up volume", "volume down", "decrease volume", "lower volume", "turn down volume"]):
+        if any(w in q for w in ["down", "decrease", "lower"]):
+            return volume_down()
+        elif any(w in q for w in ["mute", "unmute", "silence"]):
+            return mute_volume()
+        else:
+            return volume_up()
+
+    elif q in ["mute", "unmute", "mute volume", "system mute"]:
+        return mute_volume()
+
+    # 8. Content Generation (saves to Desktop and opens in Notepad)
+    elif q.startswith("content about ") or q.startswith("content on ") or q.startswith("content "):
+        topic = re.sub(r'^content\s+(?:about\s+|on\s+)?', '', c, flags=re.IGNORECASE).strip()
+        if topic:
+            return content_generation(topic)
+    elif q.startswith("write content about ") or q.startswith("write content on ") or q.startswith("generate content on ") or q.startswith("generate content about "):
+        topic = re.sub(r'^(?:write|generate)\s+content\s+(?:about\s+|on\s+)?', '', c, flags=re.IGNORECASE).strip()
+        if topic:
+            return content_generation(topic)
+
+    # 9. Reminders Automation
+    elif q.startswith("reminder") or q.startswith("remind me"):
+        time_match = re.search(r'\b(\d{1,2}(?::\d{2})?\s*(?:am|pm|a\.m\.|p\.m\.))\b', q)
+        if time_match:
+            time_input = time_match.group(1)
+            task = c
+            # Remove time and trigger prefixes from task
+            task = task.replace(time_input, "")
+            task = re.sub(r'\b(?:remind me to|reminder for|reminder to|reminder|at|on|for)\b', '', task, flags=re.IGNORECASE).strip()
+            if not task:
+                task = "Reminder"
+            return save_reminder(task, time_input)
+        elif any(k in q for k in ["tomorrow", "tonight", "later"]):
+            return "Please specify an exact time for the reminder, for example 'at 5 pm'."
+
+    # 10. Battery Status
+    elif "battery status" in q or "check battery" in q or "battery percentage" in q or "battery level" in q or "how much battery" in q:
+        return battery_alert()
+
+    # 11. Internet Connectivity Status
+    elif "internet status" in q or "check internet" in q or "is internet working" in q or "check connection" in q:
+        return internet_status()
+
+    # 12. System Hardware Stats
+    elif "check system" in q or "system stats" in q or "hardware status" in q or "system info" in q or "hardware stats" in q:
+        return get_system_stats()
+
+    # 13. Take Screenshot
+    elif "screenshot" in q or "take a screenshot" in q or "capture screen" in q:
+        return take_screenshot()
+
+    # 14. Weather Check
+    elif "weather" in q and not any(w in q for w in ["what causes", "explain", "history"]):
+        return get_weather()
+
+    # 15. Date & Time
+    elif any(phrase in q for phrase in ["what is the time", "current time", "what time is it", "tell me the time", "what is today's date", "what is the date", "what date is it", "today's date", "what day is it"]):
+        return get_date_time()
+
+    # 16. Greetings
+    elif q in ["good morning", "good afternoon", "good evening", "good night", "hello", "hi jarvis", "hey jarvis"]:
+        return greet_user()
+
+    # 17. Exit / Shutdown
+    elif q in ["exit", "quit", "goodbye", "shutdown", "bye jarvis", "close jarvis"]:
+        return "exit"
+
+    return None
 
 
 def execute_automation(action: str, target: Optional[str] = None, parameters: Optional[Dict[str, Any]] = None) -> Optional[str]:
@@ -90,12 +213,20 @@ def execute_automation(action: str, target: Optional[str] = None, parameters: Op
     elif action_lower in ["internet_status", "network_status"]:
         return internet_status()
 
-    elif action_lower in ["date_time", "time"]:
+    elif action_lower in ["date_time", "time", "date"]:
         return get_date_time()
+
+    elif action_lower in ["weather", "get_weather"]:
+        return get_weather()
+
+    elif action_lower in ["content", "content_generation", "generate_content"]:
+        return content_generation(target_clean)
+
+    elif action_lower in ["greeting", "greet_user"]:
+        return greet_user()
 
     # Reminders
     elif action_lower in ["reminder", "save_reminder", "set_reminder"]:
-        import re
         task = target_clean or params.get("task", "Reminder")
         time_input = params.get("time") or params.get("time_input", "")
 
@@ -105,7 +236,6 @@ def execute_automation(action: str, target: Optional[str] = None, parameters: Op
                 time_input = time_match.group(1)
                 task = task[:time_match.start()] + task[time_match.end():]
 
-        # Clean trailing and leading prepositions from task
         task = re.sub(r'\b(?:remind me to|reminder for|reminder to|reminder|at|on|for)\b', '', task, flags=re.IGNORECASE).strip()
         if not task:
             task = "Reminder"
@@ -113,14 +243,6 @@ def execute_automation(action: str, target: Optional[str] = None, parameters: Op
         if not time_input:
             return "Please specify a time for the reminder, for example 'at 5 pm'."
         return save_reminder(task, time_input)
-
-    # WhatsApp
-    elif action_lower in ["whatsapp", "send_whatsapp", "whatsapp_message"]:
-        receiver = target_clean or params.get("receiver", "")
-        message = params.get("message", "")
-        if not receiver or not message:
-            return "Recipient and message are required to send a WhatsApp message."
-        return send_whatsapp_instant(receiver, message)
 
     # Exit
     elif action_lower in ["exit", "quit"]:
@@ -131,3 +253,4 @@ def execute_automation(action: str, target: Optional[str] = None, parameters: Op
         if target_clean:
             return open_app(target_clean)
         return f"Unknown automation action: {action}"
+
