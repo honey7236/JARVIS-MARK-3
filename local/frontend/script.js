@@ -937,11 +937,16 @@
     var textEl    = document.getElementById('dialogue-text');
     var cardEl    = document.getElementById('dialogue-card');
 
-    if (speakerEl) speakerEl.textContent = speaker.toUpperCase();
-    if (textEl) textEl.textContent = text;
+    if (speakerEl) {
+      speakerEl.textContent = speaker.toUpperCase();
+      if (textEl) textEl.textContent = text;
+    } else if (textEl) {
+      var spk = speaker ? speaker.toUpperCase() + ": " : "";
+      textEl.textContent = spk + text;
+    }
     if (cardEl) {
-      cardEl.style.transform = 'scale(1.02)';
-      setTimeout(function() { cardEl.style.transform = 'scale(1.0)'; }, 200);
+      cardEl.style.transform = 'scale(1.01)';
+      setTimeout(function() { cardEl.style.transform = 'scale(1.0)'; }, 180);
     }
   }
 
