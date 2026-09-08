@@ -155,6 +155,41 @@ def process_query(query: str, enable_speech: bool = True) -> bool:
             intent_type = data.get("intent_type")
             current_session_id = data.get("session_id", current_session_id)
 
+            tasks = data.get("tasks")
+            if tasks and len(tasks) > 1:
+                # Compound multi-command execution plan
+                feedback_parts = []
+                for t in tasks:
+                    t_type = t.get("intent_type")
+                    if t_type == "automation":
+                        act = t.get("action")
+                        tgt = t.get("target")
+                        params = t.get("parameters") or {}
+                        res = execute_automation(act, tgt, params)
+                        if res == "exit":
+                            farewell = "Goodbye sir. Shutting down system."
+                            print(f"{Assistantname} : {farewell}")
+                            _notify_dialogue(Assistantname, farewell)
+                            if enable_speech:
+                                speak(farewell)
+                            os._exit(0)
+                        if res:
+                            feedback_parts.append(res)
+                    elif t_type in ["chat", "realtime"]:
+                        reply = t.get("response")
+                        if reply:
+                            feedback_parts.append(reply)
+
+                if not feedback_parts and data.get("response"):
+                    feedback_parts.append(data.get("response"))
+
+                final_answer = " ".join(feedback_parts) if feedback_parts else "All tasks completed, sir."
+                print(f"{Assistantname} : {final_answer}")
+                _notify_dialogue(Assistantname, final_answer)
+                if enable_speech:
+                    speak(final_answer)
+                return True
+
             if intent_type == "automation":
                 action = data.get("action")
                 target = data.get("target")

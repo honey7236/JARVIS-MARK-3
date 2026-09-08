@@ -1,4 +1,4 @@
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 import re
 import time
 
@@ -15,11 +15,131 @@ from local.automation.music import play_music_on_youtube
 from local.automation.reminders import save_reminder, start_reminder_thread
 
 
-def process_automation(command: str) -> Optional[str]:
+def _is_recognized_automation(command: str) -> bool:
     """
-    Direct zero-latency automation router ported and enhanced from JARVIS-MARK-2 backend/automation.py.
-    Evaluates PC desktop commands instantly. Returns response string if handled, or None to pass to AI Brain.
-    (News and WhatsApp automations are excluded as requested).
+    Check if a string matches any supported local automation pattern
+    WITHOUT executing side-effects.
+    """
+    if not command or not isinstance(command, str):
+        return False
+
+    c = command.strip()
+    q = c.lower()
+    if not q:
+        return False
+
+    # 1. Close
+    if "close it" in q or q in ["close this", "close window", "close active window", "close tab"]:
+        return True
+    if q.startswith("close ") and len(q.split()) > 1:
+        return True
+
+    # 2. Open / Run
+    if q.startswith("open ") and len(q.split()) > 1:
+        target = q.replace("open ", "", 1).strip()
+        if target not in ["source", "minded", "question"]:
+            return True
+    if q.startswith("run ") and len(q.split()) > 1:
+        return True
+
+    # 3. Google Search
+    if q.startswith("google search"):
+        return True
+
+    # 4. YouTube Search
+    if q.startswith("youtube search"):
+        return True
+
+    # 5. General Search
+    if q.startswith("search ") and len(q.split()) > 1:
+        return True
+
+    # 6. Play Music
+    if q.startswith("play ") and len(q.split()) > 1:
+        return True
+
+    # 7. Volume
+    if q.startswith("system volume") or q.startswith("volume ") or any(w in q for w in ["volume up", "increase volume", "turn up volume", "volume down", "decrease volume", "lower volume", "turn down volume"]):
+        return True
+    if q in ["mute", "unmute", "mute volume", "system mute"]:
+        return True
+
+    # 8. Content
+    if q.startswith("content about ") or q.startswith("content on ") or q.startswith("content "):
+        return True
+    if q.startswith("write content about ") or q.startswith("write content on ") or q.startswith("generate content on ") or q.startswith("generate content about "):
+        return True
+
+    # 9. Reminders
+    if q.startswith("reminder") or q.startswith("remind me"):
+        return True
+
+    # 10. Battery
+    if any(w in q for w in ["battery status", "check battery", "battery percentage", "battery level", "how much battery"]):
+        return True
+
+    # 11. Internet
+    if any(w in q for w in ["internet status", "check internet", "is internet working", "check connection"]):
+        return True
+
+    # 12. System stats
+    if any(w in q for w in ["check system", "system stats", "hardware status", "system info", "hardware stats"]):
+        return True
+
+    # 13. Screenshot
+    if any(w in q for w in ["screenshot", "take a screenshot", "capture screen"]):
+        return True
+
+    # 14. Weather
+    if "weather" in q and not any(w in q for w in ["what causes", "explain", "history"]):
+        return True
+
+    # 15. Date & Time
+    if any(phrase in q for phrase in ["what is the time", "current time", "what time is it", "tell me the time", "what is today's date", "what is the date", "what date is it", "today's date", "what day is it"]):
+        return True
+
+    # 16. Greetings
+    if q in ["good morning", "good afternoon", "good evening", "good night", "hello", "hi jarvis", "hey jarvis"]:
+        return True
+
+    # 17. Exit
+    if q in ["exit", "quit", "goodbye", "shutdown", "bye jarvis", "close jarvis"]:
+        return True
+
+    return False
+
+
+def split_compound_command(command: str) -> List[str]:
+    """
+    Splits compound commands connected by conjunctions ('and then', 'and also', 'then', 'and')
+    ONLY IF each resulting clause is recognized as a valid automation command.
+    Prevents erroneous splitting of entity names with conjunctions (e.g. 'rock and roll', 'tom and jerry').
+    """
+    if not command or not isinstance(command, str):
+        return []
+
+    c = command.strip()
+    if not c:
+        return []
+
+    # Check for conjunction patterns
+    parts = [p.strip() for p in re.split(r'\b(?:and\s+then|and\s+also|then|and)\b|,', c, flags=re.IGNORECASE) if p.strip()]
+    if len(parts) <= 1:
+        return [c]
+
+    # Validate that EVERY part is recognized as a valid automation action
+    for part in parts:
+        if not _is_recognized_automation(part):
+            # One or more parts is not a local automation action (could be an entity name or chat question).
+            # Do not split locally.
+            return [c]
+
+    return parts
+
+
+def _process_single_automation(command: str) -> Optional[str]:
+    """
+    Direct evaluation of an individual atomic automation command.
     """
     if not command or not isinstance(command, str):
         return None
@@ -39,7 +159,6 @@ def process_automation(command: str) -> Optional[str]:
     # 2. Open / Run application or website
     elif q.startswith("open "):
         target = c[5:].strip()
-        # Avoid intercepting phrases like "open source"
         if target.lower() not in ["source", "minded", "question"]:
             return open_app(target)
     elif q.startswith("run "):
@@ -99,7 +218,6 @@ def process_automation(command: str) -> Optional[str]:
         if time_match:
             time_input = time_match.group(1)
             task = c
-            # Remove time and trigger prefixes from task
             task = task.replace(time_input, "")
             task = re.sub(r'\b(?:remind me to|reminder for|reminder to|reminder|at|on|for)\b', '', task, flags=re.IGNORECASE).strip()
             if not task:
@@ -141,6 +259,33 @@ def process_automation(command: str) -> Optional[str]:
         return "exit"
 
     return None
+
+
+def process_automation(command: str) -> Optional[str]:
+    """
+    Direct zero-latency automation router ported and enhanced from JARVIS-MARK-2 backend/automation.py.
+    Evaluates single or chained PC desktop commands instantly.
+    Returns composite response string if handled, or None to pass to AI Brain.
+    """
+    if not command or not isinstance(command, str):
+        return None
+
+    # Check for chained compound automation commands first
+    sub_commands = split_compound_command(command)
+    if len(sub_commands) > 1:
+        results = []
+        for sub in sub_commands:
+            res = _process_single_automation(sub)
+            if res:
+                if res == "exit":
+                    return "exit"
+                results.append(res)
+        if results:
+            return " ".join(results)
+
+    # Single command evaluation
+    return _process_single_automation(command)
+
 
 
 def execute_automation(action: str, target: Optional[str] = None, parameters: Optional[Dict[str, Any]] = None) -> Optional[str]:
