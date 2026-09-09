@@ -20,6 +20,7 @@ NOTE:
 Before running, set GROQ_API_KEY (and optionally TAVILY_API_KEY for realtime search) in .env.
 """
 
+import os
 import uvicorn
 
 
@@ -30,9 +31,11 @@ import uvicorn
 # Only run uvicorn when this file is executed directly (python run.py),
 # not when it is imported by another module.
 if __name__ == "__main__":
+    # Support HF Spaces default port (7860) or any container PORT env var, default 8000 for local dev
+    port = int(os.getenv("PORT", "8000"))
     uvicorn.run(
         "app.main:app",   # String path to the FastAPI app instance (module:variable).
         host="0.0.0.0",   # Listen on all network interfaces so other devices can connect.
-        port=8000,       # HTTP port; change if 8000 is already in use.
-        reload=True      # Auto-restart when .py files change (useful during development).
+        port=port,        # HTTP port (7860 on HF Spaces, 8000 local dev).
+        reload=os.getenv("PORT") is None  # Auto-restart in local dev, stable in cloud deployment
     )

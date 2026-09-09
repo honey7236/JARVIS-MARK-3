@@ -19,7 +19,16 @@ from dotenv import dotenv_values
 # Setup base paths
 ROOT_DIR = Path(__file__).parent.parent.resolve()
 BRAIN_DIR = ROOT_DIR / "brain"
-FRONTEND_DIR = Path(__file__).parent / "frontend"
+
+def resource_path(relative_path: str) -> Path:
+    """Get absolute path to resource, compatible with PyInstaller bundles and dev mode."""
+    if hasattr(sys, "_MEIPASS"):
+        candidate = Path(sys._MEIPASS) / relative_path
+        if candidate.exists():
+            return candidate
+    return ROOT_DIR / relative_path
+
+FRONTEND_DIR = resource_path("local/frontend")
 
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
