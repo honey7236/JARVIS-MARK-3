@@ -150,16 +150,22 @@ class RealtimeGroqService(GroqService):
                 ("human", "{question}"),
             ])
 
-            messages = []
+            formatted_messages = []
             if chat_history:
                 for human_msg, ai_msg in chat_history:
-                    messages.append(HumanMessage(content=human_msg))
-                    messages.append(AIMessage(content=ai_msg))
+                    formatted_messages.append({"role": "user", "content": human_msg})
+                    formatted_messages.append({"role": "assistant", "content": ai_msg})
+            formatted_messages.append({"role": "user", "content": question})
 
-            # Uses same round-robin and fallback as general chat; next key one-by-one, try next on failure.
-            response_content = self._invoke_llm(prompt, messages, question)
-            logger.info(f"Realtime response generated for: {question}")
-            return response_content
+            # Uses FallbackManager (Gemini primary with Tavily search results, Groq fallback)
+            result = self.fallback_manager.generate(
+                messages=formatted_messages,
+                system_prompt=system_message,
+                temperature=0.8,
+                max_tokens=MAX_TOKENS
+            )
+            logger.info(f"Realtime response generated via provider={result.provider} for: {question}")
+            return result.text
 
         except Exception as e:
             logger.error(f"Error in realtime get_response: {e}", exc_info=True)

@@ -237,6 +237,7 @@ async def root():
 
 @app.get("/health")
 async def health():
+    ai_status = groq_service.fallback_manager.get_status() if (groq_service and hasattr(groq_service, "fallback_manager")) else {}
     return {
         "status": "healthy",
         "vector_store": vector_store_service is not None,
@@ -244,6 +245,7 @@ async def health():
         "realtime_service": realtime_groq_service is not None,
         "chat_service": chat_service is not None,
         "intent_service": intent_service is not None,
+        "ai_providers": ai_status
     }
 
 
