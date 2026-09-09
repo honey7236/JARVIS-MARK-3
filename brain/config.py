@@ -105,6 +105,36 @@ GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
 MAX_TOKENS = int(os.getenv("MAX_TOKENS", "512"))
 
 # ============================================================================
+# GEMINI API CONFIGURATION
+# ============================================================================
+# Gemini is used as the PRIMARY LLM; Groq (above) is the fallback if every
+# Gemini key fails (rate limit or otherwise). Same multi-key convention as
+# Groq: GEMINI_API_KEY, GEMINI_API_KEY_2, GEMINI_API_KEY_3, ... (no limit).
+# If no Gemini key is set, the app falls back to Groq-only automatically —
+# Gemini is fully optional, this never breaks an existing setup.
+
+def _load_gemini_api_keys() -> list:
+    """Same pattern as _load_groq_api_keys(): GEMINI_API_KEY, then _2, _3, ..."""
+    keys = []
+    first = os.getenv("GEMINI_API_KEY", "").strip()
+    if first:
+        keys.append(first)
+    i = 2
+    while True:
+        k = os.getenv(f"GEMINI_API_KEY_{i}", "").strip()
+        if not k:
+            break
+        keys.append(k)
+        i += 1
+    return keys
+
+
+GEMINI_API_KEYS = _load_gemini_api_keys()
+# Check ai.google.dev/gemini-api/docs/models for the current recommended
+# free-tier Flash model if this default has been superseded.
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
+
+# ============================================================================
 # TAVILY API CONFIGURATION
 # ============================================================================
 # Tavily is a fast, AI-optimized search API designed for LLM applications

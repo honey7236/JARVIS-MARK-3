@@ -32,12 +32,16 @@ Context is only what we retrieve (no full dump of learning data), so token usage
 
 from typing import List, Optional
 from langchain_groq import ChatGroq
+from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.messages import HumanMessage, AIMessage
 
 import logging
 
-from config import GROQ_API_KEYS, GROQ_MODEL, MAX_TOKENS, JARVIS_SYSTEM_PROMPT
+from config import (
+    GROQ_API_KEYS, GROQ_MODEL, MAX_TOKENS, JARVIS_SYSTEM_PROMPT,
+    GEMINI_API_KEYS, GEMINI_MODEL,
+)
 from app.services.vector_store import VectorStoreService
 from app.utils.time_info import get_time_information
 
@@ -63,11 +67,17 @@ def escape_curly_braces(text: str) -> str:
 
 def _is_rate_limit_error(exc: BaseException) -> bool:
     """
-    Return True if the exception indicates a Groq rate limit (e.g. 429, tokens per day).
+    Return True if the exception indicates a rate limit (e.g. 429, tokens per day, resource_exhausted, quota).
     Used for logging; actual fallback tries the next key on any failure when multiple keys exist.
     """
     msg = str(exc).lower()
-    return "429" in str(exc) or "rate limit" in msg or "tokens per day" in msg
+    return (
+        "429" in str(exc)
+        or "rate limit" in msg
+        or "tokens per day" in msg
+        or "resource_exhausted" in msg
+        or "quota" in msg
+    )
 
 
 def _mask_api_key(key: str) -> str:
@@ -86,9 +96,9 @@ def _mask_api_key(key: str) -> str:
 
 class GroqService:
     """"
-    General chat: retrieves context from the vector store and calls the Groq LLM.
-    Supports multiple API keys: each request uses the next key in rotation (one-by-one),
-    and if that key fails, the server tries the next key until one succeeds or all fail.
+    General chat: retrieves context from the vector store and calls the LLM.
+    Supports Gemini as primary provider (with multi-key round-robin/fallback),
+    and falls back to Groq multi-key rotation if Gemini is unavailable or fails.
 
     ROUND-ROBIN BEHAVIOR:
     - Request 1 uses key 0 (first key)
@@ -99,15 +109,17 @@ class GroqService:
     - All requests share the same round-robin counter (class-level)
     """
 
-    # Class-level counter shared across all instances (GroqService and RealtimeGroqService)
+    # Class-level counters shared across all instances (GroqService and RealtimeGroqService)
     # This ensures round-robin works across both /chat and /chat/realtime endpoints
     _shared_key_index = 0
+    _shared_gemini_key_index = 0
     _lock = None  # Will be set to threading.Lock if threading is needed (currently single-threaded)
 
     def __init__(self, vector_store_service: VectorStoreService):
         """
         Create one Groq LLM client per API key and store the vector store for retrieval.
         self.llms[i] corresponds to GROQ_API_KEYS[i]; request N uses key at index (N % len(keys)).
+        Also creates Gemini LLM clients if GEMINI_API_KEYS are provided.
         """
         if not GROQ_API_KEYS:
             raise ValueError(
@@ -125,10 +137,26 @@ class GroqService:
             for key in GROQ_API_KEYS
         ]
 
+        # Gemini clients (optional / primary). Empty list if no Gemini key is
+        # configured — _invoke_llm() then skips straight to Groq, unchanged
+        # from current behavior.
+        self.gemini_llms = [
+            ChatGoogleGenerativeAI(
+                google_api_key=key,
+                model=GEMINI_MODEL,
+                temperature=0.8,
+                max_output_tokens=MAX_TOKENS,
+            )
+            for key in GEMINI_API_KEYS
+        ]
+
         self.vector_store_service = vector_store_service
-        logger.info(f"Initialized GroqService with {len(GROQ_API_KEYS)} API key(s)")
+        logger.info(
+            f"Initialized GroqService with {len(GROQ_API_KEYS)} Groq key(s) "
+            f"and {len(self.gemini_llms)} Gemini key(s)"
+        )
         
-    def _invoke_llm(
+    def _invoke_groq(
         self,
         prompt: ChatPromptTemplate,
         messages: list,
@@ -136,6 +164,10 @@ class GroqService:
     ) -> str:
         """
         Call the LLM using the next key in rotation; on failure, try the next key until one succeeds.
+
+        NOTE: this is now the FALLBACK tier, used when Gemini is not
+        configured or every Gemini key has failed. Body is unchanged from
+        the original Groq-only implementation.
 
         - Round-robin: the request uses key at index (_shared_key_index % n), then we increment
           _shared_key_index so the next request uses the next key. All instances share the same counter.
@@ -205,6 +237,71 @@ class GroqService:
         logger.error(f"All API keys failed. Tried keys: {masked_all_keys}")
         raise Exception(
             f"Error getting response from Groq: {str(last_exc)}") from last_exc  
+
+    def _invoke_gemini(
+        self,
+        prompt: ChatPromptTemplate,
+        messages: list,
+        question: str,
+    ) -> str:
+        """
+        Same round-robin + in-order fallback pattern as _invoke_groq, but over
+        Gemini clients. Raises if every Gemini key fails; caller (_invoke_llm)
+        catches that and falls back to Groq.
+        """
+        n = len(self.gemini_llms)
+        start_i = GroqService._shared_gemini_key_index % n
+        current_key_index = GroqService._shared_gemini_key_index
+        GroqService._shared_gemini_key_index += 1
+
+        masked_key = _mask_api_key(GEMINI_API_KEYS[start_i])
+        logger.info(
+            f"Using Gemini key #{start_i + 1}/{n} (round-robin index: {current_key_index}): {masked_key}"
+        )
+
+        last_exc = None
+        for j in range(n):
+            i = (start_i + j) % n
+            try:
+                chain = prompt | self.gemini_llms[i]
+                response = chain.invoke({"history": messages, "question": question})
+                if j > 0:
+                    logger.info(
+                        f"Gemini fallback successful: key #{i + 1}/{n} succeeded: {_mask_api_key(GEMINI_API_KEYS[i])}"
+                    )
+                return response.content
+            except Exception as e:
+                last_exc = e
+                masked_failed_key = _mask_api_key(GEMINI_API_KEYS[i])
+                if _is_rate_limit_error(e):
+                    logger.warning(f"Gemini key #{i + 1}/{n} rate limited: {masked_failed_key}")
+                else:
+                    logger.warning(f"Gemini key #{i + 1}/{n} failed: {masked_failed_key} - {str(e)[:100]}")
+                continue
+
+        raise Exception(f"All Gemini keys failed: {str(last_exc)}") from last_exc
+
+    def _invoke_llm(
+        self,
+        prompt: ChatPromptTemplate,
+        messages: list,
+        question: str,
+    ) -> str:
+        """
+        Provider dispatcher: try Gemini first (if any Gemini key is configured);
+        if every Gemini key fails, fall back to Groq's existing multi-key
+        round-robin (_invoke_groq), unchanged from current behavior. If no
+        Gemini key is configured at all, this goes straight to Groq — identical
+        to today's behavior for anyone who doesn't set GEMINI_API_KEY.
+        """
+        if self.gemini_llms:
+            try:
+                return self._invoke_gemini(prompt, messages, question)
+            except Exception as gemini_exc:
+                logger.warning(
+                    f"All Gemini keys exhausted ({str(gemini_exc)[:120]}). Falling back to Groq."
+                )
+        return self._invoke_groq(prompt, messages, question)  
         
     def get_response(
             self,
