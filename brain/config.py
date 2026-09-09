@@ -105,23 +105,6 @@ GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
 MAX_TOKENS = int(os.getenv("MAX_TOKENS", "512"))
 
 # ============================================================================
-# GEMINI & AI PROVIDER CONFIGURATION
-# ============================================================================
-# Google Gemini is the PRIMARY AI provider; Groq serves as the automatic FALLBACK.
-# GEMINI_API_KEY is retrieved from .env or environment variables.
-# Model default is gemini-2.5-flash (or gemini-1.5-flash).
-
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "").strip()
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash").strip()
-
-AI_PRIMARY_PROVIDER = os.getenv("AI_PRIMARY_PROVIDER", "gemini").strip().lower()
-AI_FALLBACK_PROVIDER = os.getenv("AI_FALLBACK_PROVIDER", "groq").strip().lower()
-
-AI_FALLBACK_COOLDOWN = int(os.getenv("AI_FALLBACK_COOLDOWN", "60"))
-AI_MAX_PRIMARY_RETRIES = int(os.getenv("AI_MAX_PRIMARY_RETRIES", "1"))
-AI_REQUEST_TIMEOUT = int(os.getenv("AI_REQUEST_TIMEOUT", "30"))
-
-# ============================================================================
 # TAVILY API CONFIGURATION
 # ============================================================================
 # Tavily is a fast, AI-optimized search API designed for LLM applications

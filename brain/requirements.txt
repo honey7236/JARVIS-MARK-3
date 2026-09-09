@@ -15,4 +15,3 @@ requests
 rich
 tavily-python
 langchain-huggingface
-google-genai>=1.0.0

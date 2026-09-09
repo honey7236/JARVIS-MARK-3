@@ -30,16 +30,16 @@ FLOW:
 Context is only what we retrieve (no full dump of learning data), so token usage stays bounded.
 """
 
-import logging
 from typing import List, Optional
 from langchain_groq import ChatGroq
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.messages import HumanMessage, AIMessage
 
+import logging
+
 from config import GROQ_API_KEYS, GROQ_MODEL, MAX_TOKENS, JARVIS_SYSTEM_PROMPT
 from app.services.vector_store import VectorStoreService
 from app.utils.time_info import get_time_information
-from app.ai import FallbackManager
 
 logger = logging.getLogger("J.A.R.V.I.S")
 
@@ -126,8 +126,7 @@ class GroqService:
         ]
 
         self.vector_store_service = vector_store_service
-        self.fallback_manager = FallbackManager()
-        logger.info(f"Initialized GroqService with {len(GROQ_API_KEYS)} API key(s) and FallbackManager (Gemini primary)")
+        logger.info(f"Initialized GroqService with {len(GROQ_API_KEYS)} API key(s)")
         
     def _invoke_llm(
         self,
@@ -242,25 +241,17 @@ class GroqService:
                 ("human", "{question}"),
             ])
 
-            # Convert (user, assistant) pairs to standardized message dicts.
+            # Convert (user, assistant) pairs to LangChain message objects.
             messages = []
             if chat_history:
                 for human_msg, ai_msg in chat_history:
-                    messages.append({"role": "user", "content": human_msg})
-                    messages.append({"role": "assistant", "content": ai_msg})
-            messages.append({"role": "user", "content": question})
+                    messages.append(HumanMessage(content=human_msg))
+                    messages.append(AIMessage(content=ai_msg))
 
-            # Call FallbackManager: Gemini primary with automatic Groq fallback
-            result = self.fallback_manager.generate(
-                messages=messages,
-                system_prompt=system_message,
-                temperature=0.8,
-                max_tokens=MAX_TOKENS
-            )
-            return result.text
+            # Use next key in rotation; on failure, try remaining keys (same as realtime).
+            return self._invoke_llm(prompt, messages, question)
         except Exception as e:
-            logger.error("Error in GroqService get_response: %s", e)
-            raise Exception(f"Error getting AI response: {str(e)}") from e
+            raise Exception(f"Error getting response from Groq: {str(e)}") from e
                                  
       
     

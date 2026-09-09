@@ -26,7 +26,6 @@ from config import GROQ_API_KEYS, GROQ_MODEL, MAX_TOKENS
 from app.services.groq_service import GroqService, _mask_api_key
 from app.services.chat_service import ChatService
 from app.models import IntentResponse, IntentTaskItem
-from app.ai import FallbackManager
 
 logger = logging.getLogger("J.A.R.V.I.S")
 
@@ -116,9 +115,8 @@ class IntentService:
             )
             for key in GROQ_API_KEYS
         ]
-        self.vector_store_service = None
-        self.fallback_manager = FallbackManager()
-        logger.info(f"Initialized IntentService with FallbackManager and {len(GROQ_API_KEYS)} Groq key(s)")
+
+        logger.info(f"Initialized IntentService with {len(GROQ_API_KEYS)} key(s)")
 
     def _fast_path_single(self, query: str) -> Optional[SubTask]:
         """
@@ -244,43 +242,62 @@ class IntentService:
 
     def _invoke_classifier(self, query: str) -> CompoundIntentSchema:
         """
-        Decompose compound or tricky queries into ordered tasks using FallbackManager
-        (Gemini primary with automatic Groq fallback).
+        Call Groq structured output using shared multi-key rotation and fallback.
+        Accurately decomposes compound or tricky queries into ordered tasks.
         """
-        system_instruction = (
-            "You are an expert intent classifier and task decomposition planner for J.A.R.V.I.S. "
-            "Decompose the user query into an ordered list of tasks (`tasks`).\n\n"
-            "Guidelines:\n"
-            "1. SINGLE INTENTS:\n"
-            "   - If the user asks one thing, output exactly 1 task in `tasks`.\n"
-            "   - DO NOT split compound entities that naturally contain conjunctions like 'and' "
-            "     (e.g., 'play rock and roll' -> 1 task: play_music target='rock and roll'; "
-            "      'search for tom and jerry' -> 1 task: google_search target='tom and jerry'; "
-            "      'research and development' -> 1 task: chat).\n\n"
-            "2. COMPOUND / MULTI-COMMANDS:\n"
-            "   - If the user requests multiple distinct actions in one sentence "
-            "     (e.g. 'open notepad and explain quantum physics', 'take a screenshot and mute volume'), "
-            "     break them into sequential tasks in `tasks` in execution order.\n"
-            "   - For each automation task, set intent_type='automation', appropriate action, and target.\n"
-            "   - For each question/conversation, set intent_type='chat' or 'realtime', and put the isolated question in `query`.\n\n"
-            "3. AUTOMATION ACTIONS:\n"
-            "   ['open_app', 'close_app', 'google_search', 'youtube_search', 'play_music', "
-            "    'system_volume', 'take_screenshot', 'reminder', 'weather', 'content', 'date_time', "
-            "    'internet_status', 'battery_status', 'system_stats', 'exit']\n"
-            "4. REALTIME vs CHAT:\n"
-            "   - Realtime: current live news, today's weather/scores, or current real-time web search.\n"
-            "   - Chat: general knowledge, coding, explanations, reasoning, creative writing, memory."
-        )
+        n = len(self.llms)
+        start_i = GroqService._shared_key_index % n
+        GroqService._shared_key_index += 1
 
-        try:
-            return self.fallback_manager.generate_structured(
-                schema=CompoundIntentSchema,
-                prompt=query,
-                system_prompt=system_instruction
-            )
-        except Exception as e:
-            logger.error(f"[IntentService] Structured intent classification failed on all providers: {e}")
-            return CompoundIntentSchema(tasks=[SubTask(intent_type="chat", query=query)])
+        prompt = ChatPromptTemplate.from_messages([
+            (
+                "system",
+                "You are an expert intent classifier and task decomposition planner for J.A.R.V.I.S. "
+                "Decompose the user query into an ordered list of tasks (`tasks`).\n\n"
+                "Guidelines:\n"
+                "1. SINGLE INTENTS:\n"
+                "   - If the user asks one thing, output exactly 1 task in `tasks`.\n"
+                "   - DO NOT split compound entities that naturally contain conjunctions like 'and' "
+                "     (e.g., 'play rock and roll' -> 1 task: play_music target='rock and roll'; "
+                "      'search for tom and jerry' -> 1 task: google_search target='tom and jerry'; "
+                "      'research and development' -> 1 task: chat).\n\n"
+                "2. COMPOUND / MULTI-COMMANDS:\n"
+                "   - If the user requests multiple distinct actions in one sentence "
+                "     (e.g. 'open notepad and explain quantum physics', 'take a screenshot and mute volume'), "
+                "     break them into sequential tasks in `tasks` in execution order.\n"
+                "   - For each automation task, set intent_type='automation', appropriate action, and target.\n"
+                "   - For each question/conversation, set intent_type='chat' or 'realtime', and put the isolated question in `query`.\n\n"
+                "3. AUTOMATION ACTIONS:\n"
+                "   ['open_app', 'close_app', 'google_search', 'youtube_search', 'play_music', "
+                "    'system_volume', 'take_screenshot', 'reminder', 'weather', 'content', 'date_time', "
+                "    'internet_status', 'battery_status', 'system_stats', 'exit']\n"
+                "4. REALTIME vs CHAT:\n"
+                "   - Realtime: current live news, today's weather/scores, or current real-time web search.\n"
+                "   - Chat: general knowledge, coding, explanations, reasoning, creative writing, memory."
+            ),
+            ("human", "{query}")
+        ])
+
+        last_exc = None
+        for j in range(n):
+            i = (start_i + j) % n
+            try:
+                structured_llm = self.llms[i].with_structured_output(CompoundIntentSchema)
+                chain = prompt | structured_llm
+                result = chain.invoke({"query": query})
+                if result and result.tasks:
+                    return result
+            except Exception as e:
+                last_exc = e
+                masked_key = _mask_api_key(GROQ_API_KEYS[i])
+                logger.warning(f"IntentService key #{i+1} failed ({masked_key}): {e}")
+                if n > 1:
+                    continue
+                break
+
+        logger.error(f"All keys failed for intent classification: {last_exc}")
+        # Default fallback to chat on complete LLM outage
+        return CompoundIntentSchema(tasks=[SubTask(intent_type="chat", query=query)])
 
     def classify_and_process(self, query: str, session_id: Optional[str] = None) -> IntentResponse:
         """
