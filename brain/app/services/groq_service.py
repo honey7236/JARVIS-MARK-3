@@ -269,7 +269,22 @@ class GroqService:
                     logger.info(
                         f"Gemini fallback successful: key #{i + 1}/{n} succeeded: {_mask_api_key(GEMINI_API_KEYS[i])}"
                     )
-                return response.content
+                content = response.content
+                if isinstance(content, list):
+                    text_parts = []
+                    for part in content:
+                        if isinstance(part, dict) and "text" in part:
+                            text_parts.append(part["text"])
+                        elif isinstance(part, str):
+                            text_parts.append(part)
+                        elif hasattr(part, "text"):
+                            text_parts.append(part.text)
+                        else:
+                            text_parts.append(str(part))
+                    return "".join(text_parts).strip()
+                elif isinstance(content, str):
+                    return content.strip()
+                return str(content).strip()
             except Exception as e:
                 last_exc = e
                 masked_failed_key = _mask_api_key(GEMINI_API_KEYS[i])
