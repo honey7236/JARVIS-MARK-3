@@ -146,6 +146,8 @@ class GroqService:
                 model=GEMINI_MODEL,
                 temperature=0.8,
                 max_output_tokens=MAX_TOKENS,
+                max_retries=1,
+                timeout=15.0,
             )
             for key in GEMINI_API_KEYS
         ]

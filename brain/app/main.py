@@ -240,6 +240,7 @@ async def health():
     return {
         "status": "healthy",
         "vector_store": vector_store_service is not None,
+        "gemini_primary": len(getattr(groq_service, 'gemini_llms', [])) > 0,
         "groq_service": groq_service is not None,
         "realtime_service": realtime_groq_service is not None,
         "chat_service": chat_service is not None,
