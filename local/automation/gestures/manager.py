@@ -1,4 +1,4 @@
-﻿"""
+"""
 GESTURE CONTROL MANAGER
 =======================
 Thread-safe background lifecycle manager for the JARVIS AI Hand Gesture Mouse and Zoom Controller.
@@ -47,6 +47,7 @@ class GestureManager:
         self._initialized = True
         self.is_running = False
         self.is_paused = False
+        self.show_camera = False  # Keep camera window hidden by default
         self._thread: Optional[threading.Thread] = None
         self._stop_event = threading.Event()
         self._zoom_callback: Optional[Callable[[str, float], None]] = None
@@ -59,9 +60,12 @@ class GestureManager:
         """Check if gesture controller thread is alive and running."""
         return self.is_running and self._thread is not None and self._thread.is_alive()
 
-    def start(self) -> str:
+    def start(self, show_camera: Optional[bool] = None) -> str:
         """Start the gesture controller thread."""
         with self._lock:
+            if show_camera is not None:
+                self.show_camera = show_camera
+
             if self.is_active():
                 return "Gesture control is already active, Sir."
 
@@ -70,7 +74,7 @@ class GestureManager:
             self.is_paused = False
             self._thread = threading.Thread(target=self._run_loop, daemon=True)
             self._thread.start()
-            return "Hand gesture control activated, Sir. Both hands are now being tracked."
+            return "Hand gesture control activated, Sir. Both hands are now being tracked in the background."
 
     def stop(self) -> str:
         """Stop the gesture controller thread."""
@@ -85,11 +89,11 @@ class GestureManager:
             self._thread = None
             return "Hand gesture control deactivated, Sir."
 
-    def toggle(self) -> str:
+    def toggle(self, show_camera: Optional[bool] = None) -> str:
         """Toggle gesture control on or off."""
         if self.is_active():
             return self.stop()
-        return self.start()
+        return self.start(show_camera=show_camera)
 
     def _run_loop(self):
         """Worker loop running in background daemon thread."""
@@ -120,10 +124,11 @@ class GestureManager:
             controller = TwoHandGestureController(config)
             mouse_ctrl = MouseController(config)
 
-            cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
-            cv2.resizeWindow(window_name, 640, 480)
+            if self.show_camera:
+                cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
+                cv2.resizeWindow(window_name, 640, 480)
 
-            print("[GestureManager] Pipeline running. Ready for gestures.")
+            print("[GestureManager] Pipeline running in background. Ready for gestures.")
 
             while not self._stop_event.is_set():
                 ret, frame = cap.read()
@@ -196,23 +201,25 @@ class GestureManager:
                         for action in cleanup:
                             mouse_ctrl.dispatch(action, (0.5, 0.5))
 
-                # Render visual HUD
-                draw_hud(
-                    frame, controller, left_gesture, right_gesture, current_actions,
-                    left_features, right_features, config, self.is_paused, True
-                )
-
-                cv2.imshow(window_name, frame)
-                key = cv2.waitKey(1) & 0xFF
-
-                if key == 27 or key == ord('q'):
-                    print("[GestureManager] Exit hotkey pressed.")
-                    break
-                elif key == ord('p'):
-                    self.is_paused = not self.is_paused
-                    print(f"[GestureManager] Paused: {self.is_paused}")
-                    if self.is_paused:
-                        mouse_ctrl.drag_stop()
+                # Render visual HUD only if camera display is requested
+                if self.show_camera:
+                    draw_hud(
+                        frame, controller, left_gesture, right_gesture, current_actions,
+                        left_features, right_features, config, self.is_paused, True
+                    )
+                    cv2.imshow(window_name, frame)
+                    key = cv2.waitKey(1) & 0xFF
+                    if key == 27 or key == ord('q'):
+                        print("[GestureManager] Exit hotkey pressed.")
+                        break
+                    elif key == ord('p'):
+                        self.is_paused = not self.is_paused
+                        print(f"[GestureManager] Paused: {self.is_paused}")
+                        if self.is_paused:
+                            mouse_ctrl.drag_stop()
+                else:
+                    # Light sleep to yield CPU in invisible background mode
+                    time.sleep(0.005)
 
         except Exception as e:
             print(f"[GestureManager Error in loop]: {e}")

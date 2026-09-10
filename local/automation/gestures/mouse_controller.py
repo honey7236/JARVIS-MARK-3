@@ -51,6 +51,7 @@ class MouseController:
 
         self.zoom_rate_limit_s = self.config.get("ZOOM_RATE_LIMIT_MS", 160) / 1000.0
         self.last_zoom_time = 0.0
+        self.disable_os_zoom = self.config.get("DISABLE_OS_ZOOM", True)
 
     def map_coordinates(self, hand_norm_x: float, hand_norm_y: float) -> tuple[float, float]:
         """
@@ -166,6 +167,9 @@ class MouseController:
         Two-hand Zoom in or Zoom out using Ctrl + Mouse Wheel (or hotkey fallback).
         direction: 'in' or 'out'
         """
+        if self.disable_os_zoom:
+            return
+
         now = time.time()
         if now - self.last_zoom_time < self.zoom_rate_limit_s:
             return
