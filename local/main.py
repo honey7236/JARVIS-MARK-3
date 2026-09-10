@@ -87,6 +87,18 @@ def _offline_fallback(query: str, enable_speech: bool = True) -> bool:
     elif q.startswith("close "):
         app_name = q.replace("close ", "", 1).strip()
         result = close_app(app_name)
+    elif any(phrase in q for phrase in [
+        "activate gesture control", "activate gesture", "start gesture control",
+        "enable gesture control", "enable hand gestures", "turn on gesture control"
+    ]):
+        from local.automation.gestures.manager import gesture_manager
+        result = gesture_manager.start()
+    elif any(phrase in q for phrase in [
+        "deactivate gesture control", "deactivate gesture", "stop gesture control",
+        "disable gesture control", "turn off gesture control", "close gesture control"
+    ]):
+        from local.automation.gestures.manager import gesture_manager
+        result = gesture_manager.stop()
     elif q in ["exit", "quit", "goodbye"]:
         if enable_speech:
             speak("Goodbye sir.")

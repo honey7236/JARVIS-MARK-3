@@ -831,6 +831,20 @@
     audioPitchLevel = Math.max(0.0, Math.min(1.0, level || 0.0));
   }
 
+  // Real-time Hand Gesture Orb Zoom (Zoom In / Zoom Out)
+  var targetOrbZoom = 1.0;
+  var currentOrbZoom = 1.0;
+
+  function setOrbZoom(direction, delta) {
+    if (direction === "reset") {
+      targetOrbZoom = 1.0;
+    } else if (direction === "in") {
+      targetOrbZoom = Math.min(2.4, targetOrbZoom + (delta || 0.12));
+    } else if (direction === "out") {
+      targetOrbZoom = Math.max(0.45, targetOrbZoom + (delta || -0.12));
+    }
+  }
+
   function animate() {
     requestAnimationFrame(animate);
     var delta = clock.getDelta();
@@ -869,7 +883,11 @@
     coreGroup.scale.set(speechScale, speechScale, speechScale);
     coreGroup.rotation.z -= delta * 0.10 * speedMult;
 
-    // 5. Inertia damping
+    // 5. Hand Gesture Orb Zoom Scaling (smooth interpolation)
+    currentOrbZoom += (targetOrbZoom - currentOrbZoom) * 0.12;
+    hologramRoot.scale.set(currentOrbZoom, currentOrbZoom, currentOrbZoom);
+
+    // 6. Inertia damping
     hologramRoot.rotation.y += (targetRootRotation.y - hologramRoot.rotation.y) * 0.08;
     hologramRoot.rotation.x += (targetRootRotation.x - hologramRoot.rotation.x) * 0.08;
     if (!isDragging) targetRootRotation.y += delta * 0.03 * speedMult;
@@ -1054,6 +1072,12 @@
     eel.expose(updateAudioLevel);
     function updateAudioLevel(level) {
       setAudioLevel(level);
+    }
+
+    // Expose hand gesture zoom receiver for 3D Hologram orb scaling
+    eel.expose(updateOrbZoom);
+    function updateOrbZoom(direction, delta) {
+      setOrbZoom(direction, delta);
     }
 
     // Fetch initial state from Python

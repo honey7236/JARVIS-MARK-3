@@ -143,7 +143,28 @@ class TestAutomationModules(unittest.TestCase):
         res = take_screenshot()
         self.assertIn("Screenshot saved on your Desktop", res)
 
+    def test_internet_status(self):
+        # Internet
+        res = execute_automation("internet_status")
+        self.assertIsNotNone(res)
+
+    def test_gesture_control_automation(self):
+        from local.automation import process_automation
+        from local.automation.gestures.manager import gesture_manager
+
+        # Test execute_automation start and stop
+        with patch.object(gesture_manager, "start", return_value="Gesture started"), \
+             patch.object(gesture_manager, "stop", return_value="Gesture stopped"):
+            self.assertEqual(execute_automation("gesture_control", "start"), "Gesture started")
+            self.assertEqual(execute_automation("gesture_control", "stop"), "Gesture stopped")
+
+        # Test natural language routing
+        with patch.object(gesture_manager, "start", return_value="Gesture started"), \
+             patch.object(gesture_manager, "stop", return_value="Gesture stopped"):
+            self.assertEqual(process_automation("activate gesture control"), "Gesture started")
+            self.assertEqual(process_automation("JARVIS, activate gesture control"), "Gesture started")
+            self.assertEqual(process_automation("deactivate gesture control"), "Gesture stopped")
+
 
 if __name__ == "__main__":
     unittest.main()
-

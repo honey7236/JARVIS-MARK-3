@@ -148,6 +148,17 @@ def on_dialogue_event(speaker: str, text: str):
 
 set_dialogue_callback(on_dialogue_event)
 
+from local.automation.gestures.manager import gesture_manager
+
+def on_gesture_zoom(direction: str, delta: float):
+    """Forward real-time hand gesture zoom events to Eel WebGL Holographic HUD."""
+    try:
+        eel.updateOrbZoom(direction, float(delta))
+    except Exception:
+        pass
+
+gesture_manager.set_zoom_callback(on_gesture_zoom)
+
 
 # ============================================================
 # EXPOSED EEL FUNCTIONS (CALLED BY JAVASCRIPT FRONTEND)
@@ -237,6 +248,7 @@ def run_app():
         except Exception as e2:
             print(f"[HUD] Browser launch error: {e2}")
     finally:
+        gesture_manager.stop()
         shutdown_brain()
         print(f"[{Assistantname}] Session concluded.")
 

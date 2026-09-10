@@ -13,6 +13,7 @@ from local.automation.system import (
 )
 from local.automation.music import play_music_on_youtube
 from local.automation.reminders import save_reminder, start_reminder_thread
+from local.automation.gestures.manager import gesture_manager
 
 
 def _is_recognized_automation(command: str) -> bool:
@@ -25,6 +26,9 @@ def _is_recognized_automation(command: str) -> bool:
 
     c = command.strip()
     q = c.lower()
+    # Strip optional wake words and punctuation
+    q = re.sub(r'^(?:hey\s+|hi\s+)?jarvis[,:\s]*', '', q).strip()
+    q = re.sub(r'[.?!]+$', '', q).strip()
     if not q:
         return False
 
@@ -106,6 +110,17 @@ def _is_recognized_automation(command: str) -> bool:
     if q in ["exit", "quit", "goodbye", "shutdown", "bye jarvis", "close jarvis"]:
         return True
 
+    # 18. Gesture Control
+    if any(phrase in q for phrase in [
+        "activate gesture control", "activate gesture", "activate gestures", "start gesture control",
+        "start gesture", "enable gesture control", "enable gestures", "enable hand gestures",
+        "turn on gesture control", "turn on gestures", "gesture control", "gesture mouse",
+        "deactivate gesture control", "deactivate gesture", "deactivate gestures",
+        "stop gesture control", "stop gesture", "disable gesture control", "disable gestures",
+        "turn off gesture control", "turn off gestures", "close gesture control"
+    ]):
+        return True
+
     return False
 
 
@@ -146,6 +161,11 @@ def _process_single_automation(command: str) -> Optional[str]:
 
     c = command.strip()
     q = c.lower()
+    # Strip optional wake words and punctuation
+    q = re.sub(r'^(?:hey\s+|hi\s+)?jarvis[,:\s]*', '', q).strip()
+    q = re.sub(r'[.?!]+$', '', q).strip()
+    c = re.sub(r'^(?:hey\s+|hi\s+)?jarvis[,:\s]*', '', c, flags=re.IGNORECASE).strip()
+    c = re.sub(r'[.?!]+$', '', c).strip()
     if not q:
         return None
 
@@ -257,6 +277,24 @@ def _process_single_automation(command: str) -> Optional[str]:
     # 17. Exit / Shutdown
     elif q in ["exit", "quit", "goodbye", "shutdown", "bye jarvis", "close jarvis"]:
         return "exit"
+
+    # 18. Gesture Control (Hand tracking mouse & zoom)
+    elif any(phrase in q for phrase in [
+        "deactivate gesture control", "deactivate gesture", "deactivate gestures",
+        "stop gesture control", "stop gesture", "disable gesture control", "disable gestures",
+        "turn off gesture control", "turn off gestures", "close gesture control"
+    ]):
+        return gesture_manager.stop()
+
+    elif any(phrase in q for phrase in [
+        "activate gesture control", "activate gesture", "activate gestures", "start gesture control",
+        "start gesture", "enable gesture control", "enable gestures", "enable hand gestures",
+        "turn on gesture control", "turn on gestures"
+    ]):
+        return gesture_manager.start()
+
+    elif "gesture control" in q or "gesture mouse" in q or "hand gesture" in q:
+        return gesture_manager.toggle()
 
     return None
 
@@ -388,6 +426,19 @@ def execute_automation(action: str, target: Optional[str] = None, parameters: Op
         if not time_input:
             return "Please specify a time for the reminder, for example 'at 5 pm'."
         return save_reminder(task, time_input)
+
+    # Gesture Control
+    elif action_lower in ["gesture_control", "hand_gesture", "gestures"]:
+        tgt = target_clean.lower()
+        if tgt in ["start", "activate", "on", "enable"]:
+            return gesture_manager.start()
+        elif tgt in ["stop", "deactivate", "off", "disable", "close"]:
+            return gesture_manager.stop()
+        elif tgt in ["toggle"]:
+            return gesture_manager.toggle()
+        else:
+            # Default to start if activated
+            return gesture_manager.start()
 
     # Exit
     elif action_lower in ["exit", "quit"]:

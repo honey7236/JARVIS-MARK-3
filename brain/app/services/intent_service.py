@@ -51,7 +51,7 @@ class SubTask(BaseModel):
             "For automation queries: one of "
             "['open_app', 'close_app', 'google_search', 'youtube_search', 'play_music', "
             "'system_volume', 'take_screenshot', 'reminder', 'weather', 'content', "
-            "'date_time', 'internet_status', 'battery_status', 'system_stats', 'exit']"
+            "'date_time', 'internet_status', 'battery_status', 'system_stats', 'gesture_control', 'exit']"
         )
     )
     target: Optional[str] = Field(
@@ -123,12 +123,33 @@ class IntentService:
         Instant pattern matching for a single unambiguous local command.
         """
         q = query.lower().strip()
+        # Strip optional leading wake words and trailing punctuation
+        q = re.sub(r'^(?:hey\s+|hi\s+)?jarvis[,:\s]*', '', q).strip()
+        q = re.sub(r'[.?!]+$', '', q).strip()
         if not q:
             return None
 
         # Exit
         if q in ["exit", "quit", "goodbye", "bye jarvis", "close jarvis"]:
             return SubTask(intent_type="automation", action="exit", target=None)
+
+        # Gesture Control
+        if any(phrase in q for phrase in [
+            "deactivate gesture control", "deactivate gesture", "deactivate gestures",
+            "stop gesture control", "stop gesture", "disable gesture control", "disable gestures",
+            "turn off gesture control", "turn off gestures", "close gesture control"
+        ]):
+            return SubTask(intent_type="automation", action="gesture_control", target="stop")
+
+        if any(phrase in q for phrase in [
+            "activate gesture control", "activate gesture", "activate gestures", "start gesture control",
+            "start gesture", "enable gesture control", "enable gestures", "enable hand gestures",
+            "turn on gesture control", "turn on gestures", "open gesture control"
+        ]):
+            return SubTask(intent_type="automation", action="gesture_control", target="start")
+
+        if q in ["gesture control", "gesture mouse", "hand gestures", "toggle gesture control"]:
+            return SubTask(intent_type="automation", action="gesture_control", target="toggle")
 
         # Screenshot
         if q in ["take a screenshot", "take screenshot", "capture screen", "screenshot", "screen capture"]:
@@ -218,7 +239,8 @@ class IntentService:
         Handles chained commands before evaluating single actions to avoid
         greedy matches on compound sentences.
         """
-        parts = [p.strip() for p in re.split(r'\b(?:and\s+then|and\s+also|then|and)\b|,', query, flags=re.IGNORECASE) if p.strip()]
+        clean_q = re.sub(r'^(?:hey\s+|hi\s+)?jarvis[,:\s]*', '', query, flags=re.IGNORECASE).strip()
+        parts = [p.strip() for p in re.split(r'\b(?:and\s+then|and\s+also|then|and)\b|,', clean_q, flags=re.IGNORECASE) if p.strip()]
         if len(parts) > 1:
             matched_tasks = []
             for part in parts:
@@ -270,7 +292,7 @@ class IntentService:
                 "3. AUTOMATION ACTIONS:\n"
                 "   ['open_app', 'close_app', 'google_search', 'youtube_search', 'play_music', "
                 "    'system_volume', 'take_screenshot', 'reminder', 'weather', 'content', 'date_time', "
-                "    'internet_status', 'battery_status', 'system_stats', 'exit']\n"
+                "    'internet_status', 'battery_status', 'system_stats', 'gesture_control', 'exit']\n"
                 "4. REALTIME vs CHAT:\n"
                 "   - Realtime: current live news, today's weather/scores, or current real-time web search.\n"
                 "   - Chat: general knowledge, coding, explanations, reasoning, creative writing, memory."
